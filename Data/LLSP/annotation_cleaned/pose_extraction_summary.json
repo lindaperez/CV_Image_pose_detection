@@ -1,0 +1,16 @@
+{
+  "total_rows": 20,
+  "ok": 20,
+  "skipped_exists": 0,
+  "failed": 0,
+  "ok_with_zero_pose_frames": 0,
+  "args": {
+    "index_csv": "/Users/lindaperez/Documents/COMPUTER_VISION/Final_project/personal-git/CV_Image_pose_detection/Data/LLSP/annotation_cleaned/pose_feature_index.csv",
+    "video_dir": "/Users/lindaperez/Documents/COMPUTER_VISION/Final_project/personal-git/CV_Image_pose_detection/Data/LLSP/video",
+    "model": "yolo11n-pose.pt",
+    "conf": 0.25,
+    "imgsz": 640,
+    "overwrite": false,
+    "max_videos": 20
+  }
+}

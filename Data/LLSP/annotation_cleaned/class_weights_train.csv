@@ -1,0 +1,8 @@
+type,count,inv_freq_weight
+squat,102,0.88883
+pull_up,94,0.964475
+bench_pressing,93,0.974846
+sit_up,93,0.974846
+front_raise,92,0.985442
+push_up,89,1.018659
+jump_jacks,76,1.192903
