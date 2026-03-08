@@ -1,5 +1,5 @@
 {
-  "created_at_utc": "2026-03-08T03:42:21.041132+00:00",
+  "created_at_utc": "2026-03-08T18:32:42.313769+00:00",
   "input_paths": {
     "train": "../../Data/LLSP/annotation/train.csv",
     "valid": "../../Data/LLSP/annotation/valid.csv"
@@ -31,17 +31,17 @@
     "exclude_types": [],
     "relabel_map": {
       "stu6_11.mp4": "squat",
-      "stu11_10.mp4": "squat",
-      "stu11_11.mp4": "squat",
-      "stu11_12.mp4": "squat",
-      "stu11_13.mp4": "squat",
-      "stu11_7.mp4": "squat",
-      "stu11_8.mp4": "squat",
-      "stu11_9.mp4": "squat",
-      "stu12_0.mp4": "squat",
-      "stu12_7.mp4": "squat",
-      "stu13_0.mp4": "squat",
-      "stu13_4.mp4": "squat"
+      "stu11_10.mp4": "rowing_erg",
+      "stu11_11.mp4": "rowing_erg",
+      "stu11_12.mp4": "rowing_erg",
+      "stu11_13.mp4": "rowing_erg",
+      "stu11_7.mp4": "rowing_erg",
+      "stu11_8.mp4": "rowing_erg",
+      "stu11_9.mp4": "rowing_erg",
+      "stu12_0.mp4": "rowing_erg",
+      "stu12_7.mp4": "rowing_erg",
+      "stu13_0.mp4": "rowing_erg",
+      "stu13_4.mp4": "rowing_erg"
     },
     "remove_list": [
       "stu1_28.mp4",
