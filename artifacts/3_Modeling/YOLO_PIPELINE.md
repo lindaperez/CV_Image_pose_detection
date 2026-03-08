@@ -162,12 +162,17 @@ python3 CV_Image_pose_detection/artifacts/3_Modeling/pose_feature_extraction.py 
 ### C. Colab version with videos in Drive
 
 ```bash
+python3 CV_Image_pose_detection/artifacts/3_Modeling/build_pose_feature_index.py \
+  --exercise squat \
+  --feature-dir /content/drive/MyDrive/FinalProjectCV/CV_Image_pose_detection/Data/LLSP/annotation_cleaned/pose_features \
+  --output-csv /content/drive/MyDrive/FinalProjectCV/CV_Image_pose_detection/Data/LLSP/annotation_cleaned/pose_feature_index_squat.csv
+
 python3 /content/CV_Image_pose_detection/artifacts/3_Modeling/pose_feature_extraction.py \
-  --index-csv /content/CV_Image_pose_detection/Data/LLSP/annotation_cleaned/pose_feature_index_squat.csv \
+  --index-csv /content/drive/MyDrive/FinalProjectCV/CV_Image_pose_detection/Data/LLSP/annotation_cleaned/pose_feature_index_squat.csv \
   --video-dir /content/drive/MyDrive/FinalProjectCV/CV_Image_pose_detection/Data/LLSP/video \
   --model /content/CV_Image_pose_detection/artifacts/3_Modeling/yolo11n-pose.pt \
-  --report-path /content/CV_Image_pose_detection/Data/LLSP/annotation_cleaned/pose_extraction_report.csv \
-  --summary-path /content/CV_Image_pose_detection/Data/LLSP/annotation_cleaned/pose_extraction_summary.json \
+  --report-path /content/drive/MyDrive/FinalProjectCV/CV_Image_pose_detection/Data/LLSP/annotation_cleaned/pose_extraction_report.csv \
+  --summary-path /content/drive/MyDrive/FinalProjectCV/CV_Image_pose_detection/Data/LLSP/annotation_cleaned/pose_extraction_summary.json \
   --device cuda:0
 ```
 

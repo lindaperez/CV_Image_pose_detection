@@ -26,6 +26,15 @@ drive.mount('/content/drive')
 %cd /content/drive/MyDrive/<YOUR_PATH>/personal-git
 ```
 
+For the commands below, assume:
+
+```python
+DRIVE_PROJECT_ROOT = "/content/drive/MyDrive/FinalProjectCV/CV_Image_pose_detection"
+DRIVE_VIDEO_DIR = f"{DRIVE_PROJECT_ROOT}/Data/LLSP/video"
+DRIVE_ANNOTATION_DIR = f"{DRIVE_PROJECT_ROOT}/Data/LLSP/annotation_cleaned"
+DRIVE_POSE_FEATURE_DIR = f"{DRIVE_ANNOTATION_DIR}/pose_features"
+```
+
 ## 3. Install Dependencies
 
 ```bash
@@ -46,15 +55,19 @@ print("device_name =", torch.cuda.get_device_name(0) if torch.cuda.is_available(
 ```bash
 !python3 CV_Image_pose_detection/artifacts/3_Modeling/build_pose_feature_index.py \
   --exercise squat \
-  --output-csv CV_Image_pose_detection/Data/LLSP/annotation_cleaned/pose_feature_index_squat.csv
+  --feature-dir $DRIVE_POSE_FEATURE_DIR \
+  --output-csv $DRIVE_ANNOTATION_DIR/pose_feature_index_squat.csv
 ```
 
 ## 6. Smoke Test on 5 Squat Videos
 
 ```bash
 !python3 CV_Image_pose_detection/artifacts/3_Modeling/pose_feature_extraction.py \
-  --index-csv CV_Image_pose_detection/Data/LLSP/annotation_cleaned/pose_feature_index_squat.csv \
-  --video-dir CV_Image_pose_detection/Data/LLSP/video \
+  --index-csv $DRIVE_ANNOTATION_DIR/pose_feature_index_squat.csv \
+  --video-dir $DRIVE_VIDEO_DIR \
+  --model /content/CV_Image_pose_detection/artifacts/3_Modeling/yolo11n-pose.pt \
+  --report-path $DRIVE_ANNOTATION_DIR/pose_extraction_report.csv \
+  --summary-path $DRIVE_ANNOTATION_DIR/pose_extraction_summary.json \
   --device cuda:0 \
   --max-videos 5 \
   --overwrite
@@ -64,8 +77,11 @@ print("device_name =", torch.cuda.get_device_name(0) if torch.cuda.is_available(
 
 ```bash
 !python3 CV_Image_pose_detection/artifacts/3_Modeling/pose_feature_extraction.py \
-  --index-csv CV_Image_pose_detection/Data/LLSP/annotation_cleaned/pose_feature_index_squat.csv \
-  --video-dir CV_Image_pose_detection/Data/LLSP/video \
+  --index-csv $DRIVE_ANNOTATION_DIR/pose_feature_index_squat.csv \
+  --video-dir $DRIVE_VIDEO_DIR \
+  --model /content/CV_Image_pose_detection/artifacts/3_Modeling/yolo11n-pose.pt \
+  --report-path $DRIVE_ANNOTATION_DIR/pose_extraction_report.csv \
+  --summary-path $DRIVE_ANNOTATION_DIR/pose_extraction_summary.json \
   --device cuda:0
 ```
 
@@ -74,7 +90,7 @@ print("device_name =", torch.cuda.get_device_name(0) if torch.cuda.is_available(
 ```python
 import pandas as pd
 
-report = pd.read_csv("CV_Image_pose_detection/Data/LLSP/annotation_cleaned/pose_extraction_report.csv")
+report = pd.read_csv(f"{DRIVE_ANNOTATION_DIR}/pose_extraction_report.csv")
 report.head()
 ```
 
@@ -82,12 +98,13 @@ report.head()
 import json
 from pathlib import Path
 
-summary = json.loads(Path("CV_Image_pose_detection/Data/LLSP/annotation_cleaned/pose_extraction_summary.json").read_text())
+summary = json.loads(Path(f"{DRIVE_ANNOTATION_DIR}/pose_extraction_summary.json").read_text())
 summary
 ```
 
 ## Notes
 
 - Start with `--max-videos 5` before launching the full squat set.
+- Build the index with `--feature-dir $DRIVE_POSE_FEATURE_DIR` so the `.npy` pose files are written to Drive, not temporary `/content`.
 - If Colab disconnects, rerun the same command without `--overwrite` to skip completed files.
 - If your repo path already contains `yolo11n-pose.pt`, the extractor will find it automatically.
