@@ -1,18 +1,26 @@
 #!/usr/bin/env python3
 """
-Pose feature extraction for RepCount train/valid pipeline.
+YOLO pose extraction stage for the RepCoach offline pipeline.
 
-Reads pose_feature_index.csv, runs YOLO pose on each video, and saves
-per-video temporal features as .npy arrays with shape [T, F].
+The stage can run in two modes:
+1. Read an existing ``pose_feature_index.csv`` with ``name`` and ``feature_path``.
+2. Auto-discover videos under ``--video-dir`` and build feature paths under
+   ``--feature-dir``.
 
-Default feature vector per frame:
-- 17 keypoints * (x, y, conf) => F=51
+Each output file stores temporal pose features as a ``float32`` array with
+shape ``[T, F]`` where the default feature vector is:
+- 17 keypoints * (x, y, conf) => F = 51
 
-Usage example:
-python CV_Image_pose_detection/artifacts/modeling/pose_feature_extraction.py \
-  --index-csv CV_Image_pose_detection/Data/LLSP/annotation_cleaned/pose_feature_index.csv \
+Usage examples:
+python CV_Image_pose_detection/artifacts/3_Modeling/pose_feature_extraction.py \
+  --index-csv CV_Image_pose_detection/Data/LLSP/annotation_cleaned/pose_feature_index.csv
+
+python CV_Image_pose_detection/artifacts/3_Modeling/pose_feature_extraction.py \
+  --discover-from-videos \
   --video-dir CV_Image_pose_detection/Data/LLSP/video \
-  --model yolo11n-pose.pt
+  --feature-dir CV_Image_pose_detection/Data/LLSP/annotation_cleaned/pose_features \
+  --write-index-csv CV_Image_pose_detection/Data/LLSP/annotation_cleaned/pose_feature_index.csv \
+  --device cuda:0
 """
 
 from __future__ import annotations
@@ -20,13 +28,25 @@ from __future__ import annotations
 import argparse
 import csv
 import json
-import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Iterable, List, Optional, Tuple
 
-import cv2
-import numpy as np
+try:
+    import cv2
+except Exception as exc:  # pragma: no cover
+    cv2 = None
+    CV2_IMPORT_ERROR = exc
+else:
+    CV2_IMPORT_ERROR = None
+
+try:
+    import numpy as np
+except Exception as exc:  # pragma: no cover
+    np = None
+    NUMPY_IMPORT_ERROR = exc
+else:
+    NUMPY_IMPORT_ERROR = None
 
 try:
     from ultralytics import YOLO
@@ -38,8 +58,11 @@ else:
 
 # Resolve repository-local defaults from this script path (not from shell cwd)
 PROJECT_DIR = Path(__file__).resolve().parents[2]  # .../CV_Image_pose_detection
+REPO_ROOT = PROJECT_DIR.parent
 ANNOTATION_CLEANED_DIR = PROJECT_DIR / "Data" / "LLSP" / "annotation_cleaned"
 VIDEO_DIR_DEFAULT = PROJECT_DIR / "Data" / "LLSP" / "video"
+FEATURE_DIR_DEFAULT = ANNOTATION_CLEANED_DIR / "pose_features"
+MODEL_DEFAULT = REPO_ROOT / "yolo11n-pose.pt"
 
 
 @dataclass
@@ -60,19 +83,36 @@ def parse_args() -> argparse.Namespace:
         "--index-csv",
         type=Path,
         default=ANNOTATION_CLEANED_DIR / "pose_feature_index.csv",
-        help="Path to pose_feature_index.csv with columns: name, feature_path",
+        help="Optional CSV with columns: name, feature_path.",
+    )
+    parser.add_argument(
+        "--discover-from-videos",
+        action="store_true",
+        help="Ignore --index-csv and build the worklist by scanning --video-dir.",
     )
     parser.add_argument(
         "--video-dir",
         type=Path,
         default=VIDEO_DIR_DEFAULT,
-        help="Directory containing input videos named as in CSV `name` column.",
+        help="Directory containing input videos. Recursive .mp4 scan is supported.",
+    )
+    parser.add_argument(
+        "--feature-dir",
+        type=Path,
+        default=FEATURE_DIR_DEFAULT,
+        help="Output directory for .npy files when discovering videos directly.",
+    )
+    parser.add_argument(
+        "--write-index-csv",
+        type=Path,
+        default=None,
+        help="Optional path to write a generated name->feature_path mapping CSV.",
     )
     parser.add_argument(
         "--model",
         type=str,
-        default="yolo11n-pose.pt",
-        help="Ultralytics YOLO pose model path/name.",
+        default=str(MODEL_DEFAULT),
+        help="Ultralytics YOLO pose model path/name. Defaults to the repo-local checkpoint.",
     )
     parser.add_argument(
         "--conf",
@@ -85,6 +125,12 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=640,
         help="Inference image size.",
+    )
+    parser.add_argument(
+        "--device",
+        type=str,
+        default=None,
+        help="Optional inference device, for example: cpu, cuda, cuda:0, mps.",
     )
     parser.add_argument(
         "--max-videos",
@@ -125,6 +171,27 @@ def load_index(index_csv: Path) -> List[Dict[str, str]]:
         for row in reader:
             rows.append({"name": row["name"].strip(), "feature_path": row["feature_path"].strip()})
     return rows
+
+
+def discover_rows(video_dir: Path, feature_dir: Path) -> List[Dict[str, str]]:
+    rows: List[Dict[str, str]] = []
+    for video_path in sorted(video_dir.rglob("*.mp4"), key=lambda path: str(path)):
+        rows.append(
+            {
+                "name": video_path.name,
+                "feature_path": str((feature_dir / f"{video_path.stem}.npy").resolve()),
+            }
+        )
+    return rows
+
+
+def write_index(index_csv: Path, rows: Iterable[Dict[str, str]]) -> None:
+    index_csv.parent.mkdir(parents=True, exist_ok=True)
+    with index_csv.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["name", "feature_path"])
+        for row in rows:
+            writer.writerow([row["name"], row["feature_path"]])
 
 
 def build_video_lookup(video_dir: Path) -> Dict[str, List[Path]]:
@@ -183,6 +250,7 @@ def extract_from_video(
     video_path: Path,
     conf: float,
     imgsz: int,
+    device: Optional[str],
 ) -> Tuple[np.ndarray, int, int]:
     """
     Returns:
@@ -209,6 +277,7 @@ def extract_from_video(
                 source=frame,
                 conf=conf,
                 imgsz=imgsz,
+                device=device,
                 verbose=False,
             )
             if not pred:
@@ -288,10 +357,14 @@ def write_summary(summary_path: Path, rows: List[ExtractResult], args: argparse.
         "ok_with_zero_pose_frames": empty_pose,
         "args": {
             "index_csv": str(args.index_csv),
+            "discover_from_videos": args.discover_from_videos,
             "video_dir": str(args.video_dir),
+            "feature_dir": str(args.feature_dir),
+            "write_index_csv": str(args.write_index_csv) if args.write_index_csv else None,
             "model": args.model,
             "conf": args.conf,
             "imgsz": args.imgsz,
+            "device": args.device,
             "overwrite": args.overwrite,
             "max_videos": args.max_videos,
         },
@@ -303,20 +376,44 @@ def write_summary(summary_path: Path, rows: List[ExtractResult], args: argparse.
 def main() -> int:
     args = parse_args()
 
+    missing = []
+    if np is None:
+        missing.append(("numpy", NUMPY_IMPORT_ERROR))
+    if cv2 is None:
+        missing.append(("opencv-python", CV2_IMPORT_ERROR))
     if YOLO is None:
-        print("ERROR: ultralytics is not available.")
-        print("Import error:", IMPORT_ERROR)
-        print("Install with: pip install ultralytics")
+        missing.append(("ultralytics", IMPORT_ERROR))
+
+    if missing:
+        print("ERROR: required pose extraction dependencies are not available.")
+        for package_name, import_error in missing:
+            print(f"- {package_name}: {import_error}")
+        print("Install with: python3 -m pip install -r CV_Image_pose_detection/requirements-pose.txt")
         return 2
 
-    rows = load_index(args.index_csv)
+    args.video_dir = args.video_dir.resolve()
+    args.feature_dir = args.feature_dir.expanduser().resolve()
+    args.index_csv = args.index_csv.expanduser().resolve()
+    if args.write_index_csv is not None:
+        args.write_index_csv = args.write_index_csv.expanduser().resolve()
+
+    if args.discover_from_videos:
+        rows = discover_rows(args.video_dir, args.feature_dir)
+        if not rows:
+            print(f"ERROR: No .mp4 videos found under {args.video_dir}")
+            return 2
+        if args.write_index_csv is not None:
+            write_index(args.write_index_csv, rows)
+            print(f"Wrote discovered index: {args.write_index_csv}")
+    else:
+        rows = load_index(args.index_csv)
+
     if args.max_videos > 0:
         rows = rows[: args.max_videos]
 
-    args.video_dir = args.video_dir.resolve()
     video_lookup = build_video_lookup(args.video_dir)
     print(f"Indexed {sum(len(v) for v in video_lookup.values())} videos under {args.video_dir}")
-    model = YOLO(args.model)
+    model = YOLO(str(args.model))
 
     results: List[ExtractResult] = []
     total = len(rows)
@@ -369,6 +466,7 @@ def main() -> int:
                 video_path=video_path,
                 conf=args.conf,
                 imgsz=args.imgsz,
+                device=args.device,
             )
             np.save(feature_path, arr)
             results.append(

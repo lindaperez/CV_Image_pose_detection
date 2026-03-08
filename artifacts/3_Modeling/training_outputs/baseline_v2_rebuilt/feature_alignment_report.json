@@ -1,0 +1,10 @@
+{
+  "train_total_rows": 732,
+  "valid_total_rows": 131,
+  "train_missing_index_entries": 93,
+  "valid_missing_index_entries": 18,
+  "train_missing_feature_files": 619,
+  "valid_missing_feature_files": 113,
+  "train_rows_after_alignment": 20,
+  "valid_rows_after_alignment": 0
+}
