@@ -77,6 +77,14 @@ class ExtractResult:
     message: str
 
 
+@dataclass
+class PersonPrediction:
+    bbox: np.ndarray
+    keypoints_xy: np.ndarray
+    keypoints_conf: np.ndarray
+    box_conf: float
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Extract YOLO pose features to .npy files.")
     parser.add_argument(
@@ -131,6 +139,24 @@ def parse_args() -> argparse.Namespace:
         type=str,
         default=None,
         help="Optional inference device, for example: cpu, cuda, cuda:0, mps.",
+    )
+    parser.add_argument(
+        "--disable-track-person",
+        action="store_false",
+        dest="track_person",
+        help="Disable temporal person tracking and revert to per-frame largest-person selection.",
+    )
+    parser.add_argument(
+        "--track-search-expand",
+        type=float,
+        default=1.6,
+        help="Expansion factor for the tracked-person crop around the previous box.",
+    )
+    parser.add_argument(
+        "--track-max-misses",
+        type=int,
+        default=8,
+        help="How many consecutive missed frames to tolerate before resetting the track.",
     )
     parser.add_argument(
         "--max-videos",
@@ -225,24 +251,125 @@ def resolve_video_path(video_dir: Path, name: str, lookup: Dict[str, List[Path]]
     return candidates[0]
 
 
-def pick_main_person(result) -> Optional[int]:
-    """Pick one person index per frame (largest bbox area, fallback highest score)."""
+def box_area(box: np.ndarray) -> float:
+    return float(max(0.0, box[2] - box[0]) * max(0.0, box[3] - box[1]))
+
+
+def box_center(box: np.ndarray) -> np.ndarray:
+    return np.array([(box[0] + box[2]) / 2.0, (box[1] + box[3]) / 2.0], dtype=np.float32)
+
+
+def box_iou(box_a: np.ndarray, box_b: np.ndarray) -> float:
+    inter_x1 = max(float(box_a[0]), float(box_b[0]))
+    inter_y1 = max(float(box_a[1]), float(box_b[1]))
+    inter_x2 = min(float(box_a[2]), float(box_b[2]))
+    inter_y2 = min(float(box_a[3]), float(box_b[3]))
+    inter_w = max(0.0, inter_x2 - inter_x1)
+    inter_h = max(0.0, inter_y2 - inter_y1)
+    inter_area = inter_w * inter_h
+    denom = box_area(box_a) + box_area(box_b) - inter_area
+    return inter_area / denom if denom > 0.0 else 0.0
+
+
+def clip_box(box: np.ndarray, width: int, height: int) -> np.ndarray:
+    clipped = box.astype(np.float32).copy()
+    clipped[0] = np.clip(clipped[0], 0, max(0, width - 1))
+    clipped[1] = np.clip(clipped[1], 0, max(0, height - 1))
+    clipped[2] = np.clip(clipped[2], clipped[0] + 1, max(1, width))
+    clipped[3] = np.clip(clipped[3], clipped[1] + 1, max(1, height))
+    return clipped
+
+
+def expand_box(box: np.ndarray, factor: float, width: int, height: int) -> np.ndarray:
+    cx, cy = box_center(box)
+    half_w = max(2.0, (box[2] - box[0]) * factor / 2.0)
+    half_h = max(2.0, (box[3] - box[1]) * factor / 2.0)
+    expanded = np.array([cx - half_w, cy - half_h, cx + half_w, cy + half_h], dtype=np.float32)
+    return clip_box(expanded, width, height)
+
+
+def crop_frame(frame: np.ndarray, box: np.ndarray) -> Tuple[np.ndarray, Tuple[int, int]]:
+    x1, y1, x2, y2 = [int(v) for v in box]
+    return frame[y1:y2, x1:x2].copy(), (x1, y1)
+
+
+def extract_people_from_result(result, offset_xy: Tuple[int, int] = (0, 0)) -> List[PersonPrediction]:
     boxes = getattr(result, "boxes", None)
-    if boxes is None or boxes.xyxy is None or len(boxes) == 0:
-        return None
+    kpts = getattr(result, "keypoints", None)
+    if (
+        boxes is None
+        or boxes.xyxy is None
+        or len(boxes) == 0
+        or kpts is None
+        or kpts.xy is None
+        or len(kpts.xy) == 0
+    ):
+        return []
 
     xyxy = boxes.xyxy.detach().cpu().numpy()
-    conf = boxes.conf.detach().cpu().numpy() if boxes.conf is not None else np.ones(len(xyxy))
+    box_conf = boxes.conf.detach().cpu().numpy() if boxes.conf is not None else np.ones(len(xyxy))
+    offset = np.array(offset_xy, dtype=np.float32)
 
-    widths = np.maximum(0.0, xyxy[:, 2] - xyxy[:, 0])
-    heights = np.maximum(0.0, xyxy[:, 3] - xyxy[:, 1])
-    areas = widths * heights
+    people: List[PersonPrediction] = []
+    for idx in range(min(len(xyxy), len(kpts.xy))):
+        keypoints_xy = kpts.xy[idx].detach().cpu().numpy().astype(np.float32)
+        if kpts.conf is not None:
+            keypoints_conf = kpts.conf[idx].detach().cpu().numpy().astype(np.float32)
+        else:
+            keypoints_conf = np.ones((keypoints_xy.shape[0],), dtype=np.float32)
+        bbox = xyxy[idx].astype(np.float32)
+        bbox[[0, 2]] += offset[0]
+        bbox[[1, 3]] += offset[1]
+        keypoints_xy[:, 0] += offset[0]
+        keypoints_xy[:, 1] += offset[1]
+        people.append(
+            PersonPrediction(
+                bbox=bbox,
+                keypoints_xy=keypoints_xy,
+                keypoints_conf=keypoints_conf,
+                box_conf=float(box_conf[idx]),
+            )
+        )
+    return people
 
-    if len(areas) == 0:
+
+def infer_people(
+    model: YOLO,
+    frame: np.ndarray,
+    conf: float,
+    imgsz: int,
+    device: Optional[str],
+    offset_xy: Tuple[int, int] = (0, 0),
+) -> List[PersonPrediction]:
+    pred = model.predict(
+        source=frame,
+        conf=conf,
+        imgsz=imgsz,
+        device=device,
+        verbose=False,
+    )
+    if not pred:
+        return []
+    return extract_people_from_result(pred[0], offset_xy=offset_xy)
+
+
+def select_person(people: List[PersonPrediction], prev_bbox: Optional[np.ndarray]) -> Optional[PersonPrediction]:
+    if not people:
         return None
-    # rank by area first, then conf as tie-breaker
-    idx = int(np.lexsort((conf, areas))[-1])
-    return idx
+    if prev_bbox is None:
+        return max(people, key=lambda person: (box_area(person.bbox), person.box_conf))
+
+    prev_center = box_center(prev_bbox)
+    return max(
+        people,
+        key=lambda person: (
+            box_iou(person.bbox, prev_bbox) > 0.05,
+            box_iou(person.bbox, prev_bbox),
+            -float(np.linalg.norm(box_center(person.bbox) - prev_center)),
+            box_area(person.bbox),
+            person.box_conf,
+        ),
+    )
 
 
 def extract_from_video(
@@ -251,6 +378,9 @@ def extract_from_video(
     conf: float,
     imgsz: int,
     device: Optional[str],
+    track_person: bool,
+    track_search_expand: float,
+    track_max_misses: int,
 ) -> Tuple[np.ndarray, int, int]:
     """
     Returns:
@@ -265,6 +395,8 @@ def extract_from_video(
     feats: List[np.ndarray] = []
     frames_total = 0
     frames_used = 0
+    tracked_bbox: Optional[np.ndarray] = None
+    misses = 0
 
     try:
         while True:
@@ -273,32 +405,46 @@ def extract_from_video(
                 break
             frames_total += 1
 
-            pred = model.predict(
-                source=frame,
-                conf=conf,
-                imgsz=imgsz,
-                device=device,
-                verbose=False,
-            )
-            if not pred:
-                continue
-            res = pred[0]
-            kpts = getattr(res, "keypoints", None)
-            if kpts is None or kpts.xy is None or len(kpts.xy) == 0:
+            person: Optional[PersonPrediction] = None
+            frame_h, frame_w = frame.shape[:2]
+
+            if track_person and tracked_bbox is not None and misses <= track_max_misses:
+                search_box = expand_box(tracked_bbox, track_search_expand, frame_w, frame_h)
+                crop, offset_xy = crop_frame(frame, search_box)
+                if crop.size > 0:
+                    crop_people = infer_people(
+                        model=model,
+                        frame=crop,
+                        conf=conf,
+                        imgsz=imgsz,
+                        device=device,
+                        offset_xy=offset_xy,
+                    )
+                    person = select_person(crop_people, prev_bbox=tracked_bbox)
+
+            if person is None:
+                people = infer_people(
+                    model=model,
+                    frame=frame,
+                    conf=conf,
+                    imgsz=imgsz,
+                    device=device,
+                )
+                person = select_person(people, prev_bbox=tracked_bbox if track_person else None)
+
+            if person is None:
+                misses += 1
+                if misses > track_max_misses:
+                    tracked_bbox = None
                 continue
 
-            person_idx = pick_main_person(res)
-            if person_idx is None:
-                continue
-
-            xy = kpts.xy[person_idx].detach().cpu().numpy()  # [K,2]
-            if kpts.conf is not None:
-                kc = kpts.conf[person_idx].detach().cpu().numpy()[:, None]  # [K,1]
-            else:
-                kc = np.ones((xy.shape[0], 1), dtype=np.float32)
+            xy = person.keypoints_xy
+            kc = person.keypoints_conf[:, None]
             frame_feat = np.concatenate([xy, kc], axis=1).reshape(-1).astype(np.float32)  # [K*3]
             feats.append(frame_feat)
             frames_used += 1
+            tracked_bbox = clip_box(person.bbox, frame_w, frame_h) if track_person else None
+            misses = 0
     finally:
         cap.release()
 
@@ -365,6 +511,9 @@ def write_summary(summary_path: Path, rows: List[ExtractResult], args: argparse.
             "conf": args.conf,
             "imgsz": args.imgsz,
             "device": args.device,
+            "track_person": args.track_person,
+            "track_search_expand": args.track_search_expand,
+            "track_max_misses": args.track_max_misses,
             "overwrite": args.overwrite,
             "max_videos": args.max_videos,
         },
@@ -467,6 +616,9 @@ def main() -> int:
                 conf=args.conf,
                 imgsz=args.imgsz,
                 device=args.device,
+                track_person=args.track_person,
+                track_search_expand=args.track_search_expand,
+                track_max_misses=args.track_max_misses,
             )
             np.save(feature_path, arr)
             results.append(

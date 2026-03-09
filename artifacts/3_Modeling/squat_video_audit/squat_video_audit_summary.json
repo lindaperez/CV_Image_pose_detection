@@ -1,0 +1,24 @@
+{
+  "total_rows": 118,
+  "audited_rows": 118,
+  "missing_videos": [],
+  "severity_counts": {
+    "critical": 1,
+    "high": 1,
+    "medium": 11,
+    "review": 15,
+    "ok": 90
+  },
+  "low_confidence_counts": {
+    "mean_conf_lt_0_25": 1,
+    "mean_conf_lt_0_40": 2,
+    "mean_conf_lt_0_50": 4,
+    "mean_conf_lt_0_70": 21
+  },
+  "valid_ratio_counts": {
+    "valid_ratio_lt_0_25": 2,
+    "valid_ratio_lt_0_50": 2,
+    "valid_ratio_lt_0_75": 5,
+    "valid_ratio_lt_0_90": 12
+  }
+}
