@@ -181,16 +181,60 @@ Most downstream experimentation currently lives in notebooks:
 - `artifacts/3_Modeling/5_Squat_Feature_Extraction_Colab.ipynb`
 - `artifacts/3_Modeling/6_Squat_Rep_Counting_Colab.ipynb`
 
-## Current Results in the Workspace
+## Current Metrics
 
-The checked-in pose extraction summary shows a small successful run:
+The project does not yet have a checked-in final rep-count evaluation report, but these metrics are currently available in the workspace:
 
-- `total_rows`: 20
-- `ok`: 20
-- `failed`: 0
-- `max_videos`: 20
+### Pose Extraction Status
 
-See `Data/LLSP/annotation_cleaned/pose_extraction_summary.json` for the exact run metadata.
+From `Data/LLSP/annotation_cleaned/pose_extraction_summary.json`:
+
+- processed rows: `20`
+- successful extractions: `20`
+- failed extractions: `0`
+- zero-pose outputs: `0`
+- run cap used for that check: `20` videos
+
+### Squat Video Quality Audit
+
+From `artifacts/3_Modeling/squat_video_audit/squat_video_audit_summary.json`:
+
+- audited squat videos: `118`
+- severity breakdown:
+  - `ok`: `90`
+  - `review`: `15`
+  - `medium`: `11`
+  - `high`: `1`
+  - `critical`: `1`
+- low-confidence counts:
+  - mean confidence `< 0.25`: `1`
+  - mean confidence `< 0.40`: `2`
+  - mean confidence `< 0.50`: `4`
+  - mean confidence `< 0.70`: `21`
+- lower-body validity counts:
+  - valid ratio `< 0.25`: `2`
+  - valid ratio `< 0.50`: `2`
+  - valid ratio `< 0.75`: `5`
+  - valid ratio `< 0.90`: `12`
+
+### Training Alignment Readiness
+
+From `artifacts/3_Modeling/training_outputs/baseline_v2_rebuilt/feature_alignment_report.json`:
+
+- train rows in cleaned labels: `732`
+- valid rows in cleaned labels: `131`
+- train rows aligned to current feature files: `20`
+- valid rows aligned to current feature files: `0`
+
+### Rep Counting Evaluation
+
+The notebooks define these reporting metrics:
+
+- `MAE`
+- `RMSE`
+- `Within-1 accuracy`
+
+However, there is no checked-in artifact yet with final numeric rep-count results for those metrics. The current notebook contains the evaluation logic, but the saved notebook output does not include persisted values.
 
 ## Notes and Caveats
 
