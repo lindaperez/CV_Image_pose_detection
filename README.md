@@ -2,6 +2,8 @@
 
 This project explores exercise repetition counting from video using pose detection. The current codebase is centered on an offline pipeline for LLSP exercise videos: clean annotations, extract pose keypoints with YOLO, engineer squat-focused features, and train or evaluate rep-count models in notebooks.
 
+In this README, `LLSP` refers to the local exercise-video dataset folder used by the project. In the training context discussed here, this is related to Long Length Partials (`LLP`), also called lengthened partials: a strength-training technique where an exercise is performed only in the most stretched portion of the muscle's range of motion.
+
 ## Current Scope
 
 What is implemented now:
