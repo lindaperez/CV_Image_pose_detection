@@ -614,6 +614,8 @@ The target architecture would be:
 
 `video -> YOLO pose -> pose sequence -> shared temporal model -> {exercise class, rep count}`
 
+The candidate models listed below are restricted to approaches that are well aligned with a **YOLO-pose-first pipeline**. Architectures such as `CNN + LSTM` were intentionally not prioritized here because they are more naturally suited to raw RGB frame sequences than to already-extracted pose/keypoint sequences.
+
 #### Candidate Model Summary
 
 | Candidate model | Best use | Feasibility for this project |
@@ -733,6 +735,13 @@ Regardless of the temporal backbone, the repetition-count output can be modeled 
 #### Density / Event Prediction
 - Predict a temporal event or density signal and integrate it into a final count.
 - More aligned with some research counting methods, but more complex to implement.
+
+### Models Not Prioritized For This Pipeline
+
+| Model family | Why it is not prioritized here |
+|---|---|
+| `CNN + LSTM` | Better suited to raw RGB frame pipelines than to YOLO pose sequences; adds complexity without matching the current pose-first design |
+| Direct RGB video counters (`RepNet`, `TransRAC`, `ESCounts`, `CountLLM`) | Important as related work, but not the best-aligned next implementation step for a YOLO-pose backend |
 
 ### Current Recommendation
 
