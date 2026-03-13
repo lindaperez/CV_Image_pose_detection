@@ -481,11 +481,52 @@ Predictions + Evaluation
 
 ## 6. Existing Work and Research Gap
 
-### Draft Direction
+### Overview
 
-- Prior work includes direct video repetition-counting methods and pose-first exercise-analysis pipelines.
-- The current project does not aim to reproduce state-of-the-art counting immediately.
-- Instead, it uses a practical first iteration to validate a pose-based system design before scaling.
+Prior work relevant to this project falls into two main groups:
+
+- direct video repetition-counting models
+- pose / skeleton sequence models that are strong candidates for the next multi-exercise iteration
+
+The current project does not aim to reproduce state-of-the-art counting immediately. Instead, it uses a practical first iteration to validate a pose-based system design before scaling. The references below are divided into:
+
+- **classic references** that are still foundational
+- **recent references** from `2023` onward that better reflect the current research landscape
+
+### Classic References
+
+| Method | Type | Pros | Cons | Best use | Feasibility for this project |
+|---|---|---|---|---|---|
+| `RepNet (CVPR 2020)` | Direct video repetition counting | Class-agnostic counting, direct video-to-count pipeline, no handcrafted exercise rules | Less interpretable, different data/evaluation setup from current repo, weaker fit for future exercise recognition | Pure video-based repetition-count prediction | Good benchmark reference, low practicality for current implementation |
+| `Context-Aware and Scale-Insensitive Temporal Repetition Counting (CVPR 2020)` | Direct video repetition counting | Addresses changing repetition speed, strong historical counting reference | Older architecture family, not well aligned with the broader pose-based multi-exercise plan | Historical and methodological reference | Useful for literature review, low implementation priority |
+| `TransRAC (CVPR 2022)` | Direct video repetition counting with transformers and density regression | Strong RepCount relevance, better handling of long and realistic videos, stronger than early counting baselines | Higher implementation complexity, less interpretable, different assumptions from current repo | Research-style direct counting on RepCount-like data | High relevance as prior work, moderate to low implementation feasibility here |
+| `ST-GCN / 2s-AGCN` | Skeleton-based action recognition | Natural fit for pose data, good bridge from YOLO to learned temporal modeling, better scaling than FSM | Older than newer skeleton literature, more engineering than TCN | Learned action recognition and count prediction from pose sequences | Realistic next-step family, but heavier than a simple baseline |
+
+### Recent References (2023-Present)
+
+| Method | Type | Pros | Cons | Best use | Feasibility for this project |
+|---|---|---|---|---|---|
+| `SkeleTR (ICCV 2023)` | Skeleton-based action recognition | More modern pose-sequence backbone, better aligned with shared multi-exercise learning | More research-oriented, more complex than TCN | Multi-exercise pose-sequence learning in realistic settings | Moderate feasibility, good next-iteration reference |
+| `Skeleton-in-Context (CVPR 2024)` | Unified skeleton sequence modeling | Supports one shared representation across tasks, conceptually strong for multi-exercise learning | Experimental, less straightforward to reproduce quickly | Research-oriented shared skeleton representation learning | Good inspiration, lower immediate feasibility |
+| `BlockGCN (CVPR 2024)` | Skeleton-based action recognition | Newer graph-based pose modeling, more up to date than only citing classic graph baselines | More engineering effort than TCN, still heavier than needed for the fastest next step | Strong modern graph-based skeleton modeling | Reasonable future option, not the fastest first build |
+| `Motion Feature Learning (WACV 2024)` | Direct video repetition counting | Strong modern counting reference, improves robustness by modeling motion explicitly | Still RGB-centric, less aligned with the current pose-first repo | Modern direct video-counting benchmark reference | Useful literature reference, low direct implementation fit |
+| `Every Shot Counts / ESCounts (ACCV 2024)` | Direct video repetition counting | Strong recent performance, good reference for direct counting capability | More complex, less interpretable, weaker fit for pose-first multi-exercise plans | Research comparison for direct counting from video | Strong comparison point, but not the most practical implementation target |
+| `CountLLM (CVPR 2025)` | Direct repetitive-action counting with multimodal / LLM-style architecture | Very recent, strong generalization motivation, cutting-edge reference | Highest complexity, poor fit for a compact engineering iteration | Research frontier reference | Low near-term feasibility, high literature value |
+
+### Practical Interpretation For This Project
+
+- The **current squat prototype** was best served by a practical and inspectable pose-based pipeline, not by jumping immediately to the most complex direct video-counting model.
+- For the **next iteration**, the most suitable direction is still likely:
+  - keep YOLO Pose
+  - stop handcrafting exercise-specific logic
+  - train one shared temporal model across exercises
+- In that context, the most feasible implementation choices are:
+  - `TCN / 1D CNN` as the fastest learned baseline
+  - `ST-GCN / 2s-AGCN` or newer skeleton models as stronger longer-term pose-native options
+- Direct video methods such as `RepNet`, `TransRAC`, `ESCounts`, and `CountLLM` remain important references, but they are better treated as:
+  - literature context
+  - evaluation baselines for comparison
+  - possible future alternatives if the project later shifts away from pose-based modeling
 
 ### Why RepNet / TransRAC Were Not Used In The First Iteration
 
@@ -501,15 +542,13 @@ Predictions + Evaluation
 - In other words, RepNet or TransRAC may have been conceptually simpler for pure repetition-count prediction, but they were not necessarily faster or lower risk for this specific project once dataset adaptation, evaluation alignment, and future multi-exercise extensibility were taken into account.
 - The current implementation should therefore be understood as an architecture-validation prototype rather than an attempt to compete immediately with research-grade direct video-counting models.
 
-### To Update
+### Current conclusion
 
-- Add the final list of related work:
-  - RepNet
-  - TransRAC
-  - ESCounts
-  - CountLLM
-  - MediaPipe Pose / MoveNet / RTMPose as pose-estimation alternatives
-- Add final pros/cons and project-fit comparison
+- The classic references remain useful for grounding the project, but the next-iteration planning should be informed by newer `2023-2025` work.
+- The most adequate model for this project is not necessarily the newest one; however, checking newer work is still important to confirm that the chosen next-step architecture is technically defensible.
+- For this project, the best balance of adequacy and feasibility still appears to be a shared learned pose-sequence model rather than either:
+  - continuing with handcrafted FSM logic across many exercises
+  - or jumping immediately to a heavy direct RGB counting architecture
 
 ---
 
@@ -574,6 +613,18 @@ The next iteration is expected to move away from handcrafted exercise-specific r
 The target architecture would be:
 
 `video -> YOLO pose -> pose sequence -> shared temporal model -> {exercise class, rep count}`
+
+#### Candidate Model Summary
+
+| Candidate model | Best use | Feasibility for this project |
+|---|---|---|
+| `TCN / 1D CNN` | Best practical first learned baseline | High |
+| `ST-GCN / 2s-AGCN` | Best pose-native long-term direction | Moderate |
+| `GRU / LSTM` | Straightforward sequence baseline | Moderate |
+| `SkeleTR` | Modern research-oriented skeleton model | Moderate |
+| `BlockGCN` | Modern graph-based skeleton model | Moderate |
+| `PoseConv3D` | Stronger advanced skeleton representation | Low |
+| `Transformer encoder on pose tokens` | Flexible temporal modeling, but high tuning risk | Low |
 
 #### Option 1. TCN / 1D CNN on Pose Sequences
 
@@ -710,19 +761,24 @@ This recommendation supports the broader project goal of moving from a squat-onl
 
 ### External References To Keep
 
-- RepCount dataset page
-- TransRAC
-- RepNet
-- ESCounts
-- CountLLM
-- Bai et al. Temporal Convolutional Networks
-- ST-GCN
-- 2s-AGCN
-- PoseConv3D
-- Ultralytics docs
-- OpenCV docs
-- NumPy docs
-- Pandas docs
+- RepCount dataset page: https://svip-lab.github.io/dataset/RepCount_dataset.html
+- RepNet (CVPR 2020): https://openaccess.thecvf.com/content_CVPR_2020/html/Dwibedi_Counting_Out_Time_Class_Agnostic_Video_Repetition_Counting_in_the_CVPR_2020_paper.html
+- Context-Aware and Scale-Insensitive Temporal Repetition Counting (CVPR 2020): https://openaccess.thecvf.com/content_CVPR_2020/html/Zhang_Context-Aware_and_Scale-Insensitive_Temporal_Repetition_Counting_CVPR_2020_paper.html
+- TransRAC (CVPR 2022): https://openaccess.thecvf.com/content/CVPR2022/html/Hu_TransRAC_Encoding_Multi-Scale_Temporal_Correlation_With_Transformers_for_Repetitive_Action_CVPR_2022_paper.html
+- SkeleTR (ICCV 2023): https://openaccess.thecvf.com/content/ICCV2023/html/Duan_SkeleTR_Towards_Skeleton-based_Action_Recognition_in_the_Wild_ICCV_2023_paper.html
+- Skeleton-in-Context (CVPR 2024): https://openaccess.thecvf.com/content/CVPR2024/html/Wang_Skeleton-in-Context_Unified_Skeleton_Sequence_Modeling_with_In-Context_Learning_CVPR_2024_paper.html
+- BlockGCN (CVPR 2024): https://openaccess.thecvf.com/content/CVPR2024/html/Zhou_BlockGCN_Redefine_Topology_Awareness_for_Skeleton-Based_Action_Recognition_CVPR_2024_paper.html
+- Motion Feature Learning for Repetitive Action Counting (WACV 2024): https://openaccess.thecvf.com/content/WACV2024/html/Li_Repetitive_Action_Counting_With_Motion_Feature_Learning_WACV_2024_paper.html
+- Every Shot Counts / ESCounts (ACCV 2024): https://openaccess.thecvf.com/content/ACCV2024/html/Sinha_Every_Shot_Counts_Using_Exemplars_for_Repetition_Counting_in_Videos_ACCV_2024_paper.html
+- CountLLM (CVPR 2025): https://openaccess.thecvf.com/content/CVPR2025/html/Yao_CountLLM_Towards_Generalizable_Repetitive_Action_Counting_via_Large_Language_Model_CVPR_2025_paper.html
+- Bai et al. Temporal Convolutional Networks: https://vladlen.info/publications/tcn/
+- ST-GCN: https://aaai.org/papers/12328-spatial-temporal-graph-convolutional-networks-for-skeleton-based-action-recognition/
+- 2s-AGCN: https://openaccess.thecvf.com/content_CVPR_2019/html/Shi_Two-Stream_Adaptive_Graph_Convolutional_Networks_for_Skeleton-Based_Action_Recognition_CVPR_2019_paper.html
+- PoseConv3D: https://openaccess.thecvf.com/content/CVPR2022/html/Duan_Revisiting_Skeleton-Based_Action_Recognition_CVPR_2022_paper.html
+- Ultralytics docs: https://docs.ultralytics.com/
+- OpenCV docs: https://docs.opencv.org/
+- NumPy docs: https://numpy.org/doc/
+- Pandas docs: https://pandas.pydata.org/docs/
 
 ---
 
