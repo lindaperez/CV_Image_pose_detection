@@ -36,6 +36,64 @@ CV_Image_pose_detection/
 └── requirements-pose.txt               # minimal dependencies for pose extraction
 ```
 
+## Folder Guide
+
+### `artifacts/1_EDA`
+
+This folder contains the exploratory data analysis work used to understand the RepCount / LLSP data before building the pipeline.
+
+Main contents:
+
+- `1_EDA_34.ipynb`: primary EDA notebook
+- class distribution plots such as `class_imbalance_train_valid.png`
+- repetition and duration plots such as `count_distribution.png` and `cycle_duration.png`
+- per-exercise inspection PDFs such as `squat_inspection.pdf`, `push_up_inspection.pdf`, and `pull_up_inspection.pdf`
+
+Purpose:
+
+- inspect the dataset visually
+- understand class imbalance
+- examine repetition count distributions
+- identify data quality issues before modeling
+
+### `artifacts/2_Data_preparation`
+
+This folder contains the notebook used to clean labels and prepare the dataset contract used by later steps.
+
+Main contents:
+
+- `2_Data_Preparation_01.ipynb`: label cleaning, split checks, and preparation workflow
+
+Purpose:
+
+- clean and standardize the annotations
+- verify train / validation splits
+- produce the cleaned CSVs used by modeling:
+  - `Data/LLSP/annotation_cleaned/train_cleaned.csv`
+  - `Data/LLSP/annotation_cleaned/valid_cleaned.csv`
+
+### `artifacts/3_Modeling`
+
+This folder contains the executable modeling pipeline and the Colab notebooks used for squat pose extraction, feature engineering, and rep counting.
+
+Main contents:
+
+- `build_pose_feature_index.py`: build `pose_feature_index.csv` or `pose_feature_index_squat.csv`
+- `pose_feature_extraction.py`: run YOLO pose extraction and write raw pose `.npy` arrays
+- `analyze_squat_video_quality.py`: audit squat feature outputs and tag likely failure modes
+- `3_Model_Training_01.ipynb`: baseline temporal training notebook from extracted pose features
+- `4_Squat_Pose_Extraction_Colab.ipynb`: Colab stage for squat pose extraction
+- `5_Squat_Feature_Extraction_Colab.ipynb`: Colab stage for engineered squat features
+- `6_Squat_Rep_Counting_Colab.ipynb`: Colab stage for FSM-based rep counting and evaluation
+- `YOLO_PIPELINE.md`, `YOLO_POSE_STAGE.md`, `COLAB_SQUAT_POSE.md`: runbooks and stage documentation
+
+Purpose:
+
+- move from cleaned labels to pose features
+- convert raw pose into squat-specific engineered features
+- run counting and evaluate the squat baseline
+- support alternative training experiments from extracted features
+
 ## Data Snapshot
 
 The cleaned labels currently used by the pipeline are:
@@ -90,7 +148,48 @@ yolo11n-pose.pt
 
 This file is already present in the workspace.
 
-## Main Pipeline
+## Main Pipeline and Run Order
+
+The project has one main squat-focused path and one optional experimental branch.
+
+### Main Squat Pipeline
+
+Run these in order:
+
+1. `artifacts/1_EDA/1_EDA_34.ipynb`
+   Use this first if you want to understand the dataset and class distributions before building features.
+
+2. `artifacts/2_Data_preparation/2_Data_Preparation_01.ipynb`
+   Produces the cleaned annotations used by the later stages.
+
+3. `artifacts/3_Modeling/build_pose_feature_index.py`
+   Build the squat-only index from the cleaned annotations.
+
+4. `artifacts/3_Modeling/4_Squat_Pose_Extraction_Colab.ipynb`
+   Reads videos and writes raw pose arrays in `pose_features/`.
+
+5. `artifacts/3_Modeling/5_Squat_Feature_Extraction_Colab.ipynb`
+   Reads `pose_features/` and writes engineered squat features in `squat_features/`, plus:
+   - `squat_feature_index.csv`
+   - `squat_feature_summary.csv`
+
+6. `artifacts/3_Modeling/6_Squat_Rep_Counting_Colab.ipynb`
+   Reads the engineered squat features and produces rep-count predictions and evaluation metrics such as `MAE`, `RMSE`, and `Within-1`.
+
+7. `artifacts/3_Modeling/analyze_squat_video_quality.py`
+   Optional audit step after feature extraction when you want to inspect difficult squat videos or diagnose pose/feature quality issues.
+
+### Optional Local Script Path
+
+If you do not want to use Colab for pose extraction, the local script path is:
+
+1. `build_pose_feature_index.py`
+2. `pose_feature_extraction.py`
+3. downstream Colab or notebook stages for squat features and rep counting
+
+### Optional Experimental Branch
+
+`artifacts/3_Modeling/3_Model_Training_01.ipynb` is a separate experimental branch for training a temporal regressor from extracted pose features. It is not the main squat FSM pipeline and should be treated as an alternative modeling path.
 
 ### 1. Build a Pose Feature Index
 
