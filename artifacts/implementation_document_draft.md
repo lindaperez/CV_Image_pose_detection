@@ -339,6 +339,9 @@ Predictions + Evaluation
 - The current FSM backend is working end to end, but it still requires calibration and does not yet remove the need for exercise-specific tuning.
 - The tuned results are better than the untuned baseline in the synced local artifacts, which supports the decision to keep validation separate from train during tuning.
 - The main bottleneck has now moved from data generation to counting robustness and eventual scaling beyond squat.
+- A later squat-only learned experiment using a TCN regressor also showed that the counting backend can be replaced without changing the upstream pose and feature pipeline.
+- After controlled and targeted tuning in `6_TCN_Training_Colab.ipynb`, the best balanced learned squat run became `squat_tcn_l1_channels96_dropout01`.
+- That learned branch improved validation `MAE` and `RMSE` relative to the current synced FSM result while remaining competitive on `Within-1`, which strengthens the case for moving from handcrafted counting toward learned temporal modeling in later iterations.
 
 #### Stage 8. Output and Evaluation
 
@@ -552,6 +555,42 @@ The current project does not aim to reproduce state-of-the-art counting immediat
 
 ---
 
+## 6.5. Novelty and Contribution
+
+### What is novel here
+
+- The project does **not** claim novelty in the sense of inventing a new state-of-the-art repetition-counting model.
+- The novelty is instead in the **system-level design and validation strategy** used for this specific exercise-analysis problem.
+
+### Project-specific contribution
+
+- The project starts from a noisy RepCount / LLSP-style dataset and performs explicit **EDA-driven cleaning, relabeling, and preparation** before modeling.
+- It validates a **pose-first architecture** for repetition counting rather than moving directly to a raw RGB video-counting model.
+- It uses a **squat-only first iteration** as a controlled validation stage for a broader multi-exercise goal.
+- It compares two different counting backends on top of the same upstream pipeline:
+  - an interpretable **FSM-based counter**
+  - a learned **TCN-based temporal regressor**
+- It shows that the counting backend can be replaced without changing the upstream data-preparation, pose-extraction, and feature-engineering stages.
+- It also adds failure analysis showing that the remaining learned-model errors are not strongly explained by pose-quality summary metrics alone.
+
+### Why this matters
+
+- This makes the work a meaningful **engineering and methodology contribution**, even without proposing a brand-new counting architecture.
+- The project demonstrates an end-to-end, inspectable pipeline that goes from:
+  - raw exercise videos
+  - cleaned annotations
+  - YOLO-based pose extraction
+  - engineered temporal features
+  - alternative counting backends
+  - saved evaluation artifacts
+- That combination is useful because it creates a practical foundation for the intended next step: a shared multi-exercise learned model for exercise recognition and repetition counting.
+
+### Contribution statement
+
+> The main contribution of this project is the design and validation of a modular pose-based repetition-counting pipeline for exercise videos. Rather than introducing a new foundational counting architecture, the project contributes a reproducible end-to-end workflow that integrates dataset cleaning, YOLO-based pose extraction, engineered squat features, a rule-based baseline, and a learned temporal alternative, thereby establishing a practical foundation for future multi-exercise recognition and counting.
+
+---
+
 ## 7. Current Metrics
 
 ### Baseline / Current Known Metrics
@@ -576,6 +615,70 @@ The current project does not aim to reproduce state-of-the-art counting immediat
   - `Within-1 = 0.6764705882352942`
 - These values were recomputed from the synced local `squat_rep_count_results_tuned.csv` artifact and should be treated as the current saved-state metrics unless a newer Colab rerun overwrites them.
 
+### Squat-Only TCN Experiment
+
+- A squat-only `TCN / 1D CNN` regressor was trained as a learned alternative to the FSM backend while keeping the same upstream Colab 4 and Colab 5 pipeline.
+- The initial TCN baseline was then followed by controlled runs on:
+  - `loss = l1`
+  - `seq_len = 192`
+  - metric-aware checkpointing
+  - wider channel settings
+  - targeted dropout and learning-rate changes
+- The best balanced final learned run from `6_TCN_Training_Colab.ipynb` is:
+  - `run_name = squat_tcn_l1_channels96_dropout01`
+  - `channels = 96`
+  - `lr = 0.001`
+  - `dropout = 0.1`
+  - `loss = l1`
+  - `best_epoch = 48`
+  - `valid rows = 16`
+  - `valid MAE = 2.132887`
+  - `valid RMSE = 3.099379`
+  - `valid Within-1 = 0.5000`
+- This run outperformed the earlier TCN variants in overall balance:
+  - lower `MAE` than the earlier `channels96` run
+  - similar `RMSE`
+  - stronger `Within-1` than the lower-learning-rate and larger-width alternatives
+
+### FSM vs TCN Comparison
+
+| Model | Split | Rows | MAE | RMSE | Within-1 |
+|---|---|---:|---:|---:|---:|
+| `FSM (tuned)` | `valid` | 16 | 3.0625 | 4.9181 | 0.5625 |
+| `TCN (best balanced)` | `valid` | 16 | 2.1329 | 3.0994 | 0.5000 |
+
+### Interpretation
+
+- The best tuned squat-only TCN improved validation `MAE` and `RMSE` relative to the tuned FSM baseline, which suggests better average count estimation.
+- The tuned FSM still retained a slightly stronger `Within-1` score, which suggests it produced more near-exact predictions even though its average error was larger.
+- Both `MAE` and `Within-1` are error-oriented quality measures, but they emphasize different behavior:
+  - `MAE` measures the average size of the counting error
+  - `Within-1` measures how often the prediction lands within one repetition of the true count
+- Therefore, it is possible for `MAE` to improve while `Within-1` decreases if the model reduces large mistakes overall but produces fewer near-exact predictions.
+- In practical terms, this means the learned TCN now provides clearly better average count quality while remaining reasonably close to the FSM on strict tolerance-based performance.
+- Additional failure analysis in `6_TCN_Training_Colab.ipynb` also showed that the remaining TCN errors are only weakly correlated with `frames_valid`, `mean_conf`, and `valid_ratio`, which suggests that the remaining misses are not strongly driven by poor pose extraction alone.
+- This comparison supports the conclusion that a learned backend is viable, but metric selection still matters because different models optimize different aspects of counting quality.
+
+### Results Summary
+
+The current squat-only prototype can now be treated as a consolidated first-iteration result rather than an open-ended tuning exercise. The tuned FSM remains the interpretable rule-based baseline, while the tuned TCN provides the strongest learned alternative on the same upstream pose and feature pipeline.
+
+At the validation level, the tuned FSM achieved:
+- `MAE = 3.0625`
+- `RMSE = 4.9181`
+- `Within-1 = 0.5625`
+
+The best learned TCN configuration, `squat_tcn_l1_channels96_dropout01`, achieved:
+- `MAE = 2.1329`
+- `RMSE = 3.0994`
+- `Within-1 = 0.5000`
+
+Taken together, these results show that the learned TCN substantially improves average counting accuracy relative to the FSM baseline, while the FSM remains slightly stronger on the stricter near-exact tolerance metric. This means the project has already validated two important points:
+- the upstream pose-based architecture is workable end to end
+- the counting backend can be replaced by a learned temporal model without changing the upstream pipeline
+
+Therefore, the present squat-only system should be reported as a validated prototype with both an interpretable baseline and a learned temporal baseline, rather than as an unfinished exploratory branch.
+
 ### To Update
 
 - Sync `squat_rep_metrics_summary.csv` after rerunning the final Colab 6 export cell if a single-file metrics summary is still desired.
@@ -587,21 +690,50 @@ The current project does not aim to reproduce state-of-the-art counting immediat
 
 ### Immediate Next Steps
 
-- Finalize the current squat counting baseline
+- Freeze `squat_tcn_l1_channels96_dropout01` as the current best learned squat baseline
 - Save and verify all result CSV artifacts
-- Inspect the hardest validation examples
+- Inspect the hardest `valid` examples from `predictions.csv`
+- Record manual failure notes for the worst validation videos, especially cases where pose quality is strong but the count is still wrong
+
+### Error Analysis Checklist
+
+To interpret the current TCN results correctly, the next evaluation pass should inspect `predictions.csv` and focus on the `valid` examples:
+
+1. sort the `valid` rows by `abs_error`
+2. identify the worst-counted validation videos
+3. compare `pred_count` against `true_count`
+4. determine whether the TCN errors are mostly moderate misses or a few large failures
+5. manually inspect whether hard videos include contextual variation such as occlusion, exercise assistance, or atypical squat execution
+6. separate the remaining errors into:
+   - pose / feature quality issues
+   - contextual or biomechanical variation
+   - model counting behavior or target ambiguity
 
 ### Mid-Term Next Steps
 
-- Extend to one or two additional exercise classes
-- Add exercise recognition before exercise-specific counting
-- Compare FSM against a learned temporal pose model if still within scope
+- Stop broad squat-only tuning unless failure analysis reveals one clear fix
+- Keep the squat branch as the validated prototype and baseline for comparison
+- Prepare the transition to a shared multi-exercise learned model while keeping YOLO Pose as the front end
 
 ### Long-Term Next Steps
 
 - Generalize to a multi-exercise system
+- Build a shared pose-sequence data contract with labels for both exercise class and repetition count
+- Start with a multi-exercise TCN baseline before moving to heavier pose-native models such as `ST-GCN`
 - Reduce notebook dependency
 - Move toward broader deployment settings
+
+### Proposed Next Architecture
+
+The next architecture should move beyond squat-only counting and explicitly separate three decisions that are currently entangled in the video: identifying the target person, identifying the exercise or movement being performed, and estimating the repetition count. The recommended direction is therefore a two-stage design in which the system first selects the relevant exercising person and recognizes the exercise, and only then applies a repetition-counting model to that chosen target.
+
+In practical terms, the intended next architecture is:
+
+`video -> target person selection / tracking -> exercise recognition -> repetition counting`
+
+The pose-based version of this architecture would keep the validated YOLO frontend, use a temporal classifier to identify the exercise from the selected person's pose sequence, and then apply a counting model to the same selected target. This design is better aligned with the real project goal than applying counting directly to the whole scene, especially in videos that contain multiple people, unrelated motion, occlusion, or obstacles.
+
+This also establishes a clear design principle for future work: counting should be applied only after the system has identified the correct subject and the correct exercise context. In other words, the next-stage system is expected to be a detect-first-then-count pipeline rather than a single counting model applied to the full video without subject or activity disambiguation.
 
 ### Candidate Models For The Next Iteration
 
@@ -801,3 +933,5 @@ Use this section to keep a quick running history of changes.
 - `2026-03-13`: Updated Stage 4 and Stage 5 from `4_Squat_Pose_Extraction_Colab.ipynb`, including the Drive-backed squat index, Colab 4 smoke test, GPU-based YOLO inference, and the successful `118/118` squat pose-extraction result.
 - `2026-03-13`: Updated Stage 6 from `5_Squat_Feature_Extraction_Colab.ipynb`, including the Drive-based feature pipeline, saved squat feature artifacts, and the successful `118/118` engineered-feature run with high lower-body confidence.
 - `2026-03-13`: Updated Stage 7, Stage 8, and the metrics section from `6_Squat_Rep_Counting_Colab.ipynb` and synced Colab 6 CSV outputs, including baseline results, tuning artifacts, and the current saved tuned train/valid metrics.
+- `2026-03-13`: Added the squat-only TCN training branch, including the Colab notebook, trainer script, TCN metrics, and an FSM-versus-TCN comparison in the draft.
+- `2026-03-13`: Updated the draft with the final `6_TCN_Training_Colab.ipynb` tuning results, promoted `squat_tcn_l1_channels96_dropout01` as the current best learned squat baseline, and added the failure-analysis conclusion that remaining TCN errors are only weakly correlated with pose-quality summary metrics.
