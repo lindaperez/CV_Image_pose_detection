@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Squat Runtime Prototype</title>
+  <style>
+    :root {
+      --bg: #f6f1e8;
+      --panel: #fffdf8;
+      --ink: #1f1d1a;
+      --muted: #6c655b;
+      --line: #ddd2c4;
+      --accent: #b84c2a;
+      --accent-soft: #f7ddd2;
+      --shadow: 0 10px 30px rgba(32, 26, 18, 0.08);
+      --radius: 18px;
+      --ok: #2d6a4f;
+      --warn: #8d6a17;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(184, 76, 42, 0.12), transparent 28%),
+        linear-gradient(180deg, #fbf8f3 0%, var(--bg) 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .shell {
+      max-width: 1440px;
+      margin: 0 auto;
+      display: grid;
+      gap: 18px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 20px;
+    }
+
+    .hero,
+    .stats,
+    .grid,
+    .mode-grid {
+      display: grid;
+      gap: 14px;
+    }
+
+    .hero {
+      grid-template-columns: 1.15fr 0.95fr;
+      align-items: start;
+    }
+
+    .stats {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .grid {
+      grid-template-columns: 1.1fr 1fr;
+    }
+
+    .mode-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    h1, h2, h3 { margin: 0; line-height: 1.2; }
+    h1 { font-size: clamp(1.9rem, 4vw, 2.8rem); margin-bottom: 10px; }
+    h2 { font-size: 1.05rem; margin-bottom: 12px; }
+    h3 { font-size: 1rem; margin-bottom: 8px; }
+
+    p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .kicker {
+      display: inline-flex;
+      width: fit-content;
+      padding: 7px 12px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      border: 1px solid rgba(184, 76, 42, 0.18);
+      font-size: 0.88rem;
+      margin-bottom: 12px;
+    }
+
+    .button-row,
+    .link-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .button,
+    .link-list a {
+      border: 0;
+      border-radius: 999px;
+      padding: 10px 14px;
+      background: var(--ink);
+      color: #fff;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font: inherit;
+    }
+
+    .button.secondary,
+    .link-list a.secondary {
+      background: #e7ddd1;
+      color: var(--ink);
+    }
+
+    .stat,
+    .card,
+    .mode-card {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: #fff;
+      padding: 16px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .stat strong {
+      display: block;
+      color: var(--accent);
+      font-size: 1.55rem;
+      margin-bottom: 6px;
+    }
+
+    .chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 10px;
+      background: #fff;
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+
+    .chip.ok {
+      color: var(--ok);
+      border-color: rgba(45, 106, 79, 0.22);
+      background: rgba(45, 106, 79, 0.08);
+    }
+
+    .chip.warn {
+      color: var(--warn);
+      border-color: rgba(141, 106, 23, 0.24);
+      background: rgba(141, 106, 23, 0.08);
+    }
+
+    pre {
+      margin: 0;
+      padding: 14px;
+      border: 1px solid #e8dccd;
+      border-radius: 14px;
+      background: #faf6f0;
+      overflow: auto;
+      color: #2b2520;
+      font-size: 0.9rem;
+      line-height: 1.45;
+    }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.92em;
+    }
+
+    ul {
+      margin: 0;
+      padding-left: 18px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    li + li {
+      margin-top: 6px;
+    }
+
+    @media (max-width: 1100px) {
+      .hero,
+      .stats,
+      .grid,
+      .mode-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <section class="panel hero">
+      <div>
+        <span class="kicker">Squat-only prototype</span>
+        <h1>Squat Runtime</h1>
+        <p>This page documents the smallest runnable counting surface in the repo. It packages the squat-only branch into one runtime: optional YOLO pose extraction, engineered squat features, and the dedicated squat TCN, with FSM retained as a transparent fallback/reference path.</p>
+      </div>
+      <div class="link-list">
+        <a class="button secondary" href="../../index.html">Open home</a>
+        <a class="button secondary" href="./architecture_results_dashboard.html">Open results hub</a>
+        <a class="button secondary" href="./live_squat_runtime_dashboard.html">Open live webcam page</a>
+        <a class="button secondary" href="../../README.md">Open README</a>
+        <a class="button" href="./run_squat_counter.py" target="_blank" rel="noopener noreferrer">Open runtime script</a>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="stats">
+        <div class="stat">
+          <strong>1</strong>
+          <span>Exercise supported directly</span>
+        </div>
+        <div class="stat">
+          <strong>3</strong>
+          <span>Input modes: video, pose, features</span>
+        </div>
+        <div class="stat">
+          <strong>TCN</strong>
+          <span>Default packaged runtime backend</span>
+        </div>
+        <div class="stat">
+          <strong>2.14</strong>
+          <span>Best measured squat MAE in the broader project</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Why This Exists</h2>
+      <div class="grid">
+        <article class="card">
+          <h3>Scope</h3>
+          <div class="chip-row">
+            <span class="chip ok">runnable locally</span>
+            <span class="chip ok">offline prototype</span>
+            <span class="chip warn">not the full routed system</span>
+          </div>
+          <p>The broader project ended with an exercise-dependent route map. This runtime does not try to hide that. It exposes only the squat path because that is the cleanest branch to package locally from the repo artifacts, and it now defaults to the saved squat TCN checkpoint.</p>
+        </article>
+        <article class="card">
+          <h3>Why keep FSM at all</h3>
+          <p>The dedicated squat TCN is the right default because its full local run directory is now available. The FSM is still kept because it is transparent, easy to debug, and useful as a fallback/reference path when you want event-frame style diagnostics.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Input Modes</h2>
+      <div class="mode-grid">
+        <article class="mode-card">
+          <h3><code>--video-path</code></h3>
+          <p>Runs YOLO pose extraction first, then builds squat features and counts repetitions.</p>
+          <div class="chip-row">
+            <span class="chip">slowest</span>
+            <span class="chip">needs OpenCV + Ultralytics</span>
+          </div>
+        </article>
+        <article class="mode-card">
+          <h3><code>--pose-path</code></h3>
+          <p>Starts from an existing pose array shaped like the project pose features: <code>[T, 51]</code>.</p>
+          <div class="chip-row">
+            <span class="chip">middle path</span>
+            <span class="chip">reuses extracted pose</span>
+          </div>
+        </article>
+        <article class="mode-card">
+          <h3><code>--feature-path</code></h3>
+          <p>Starts from an existing engineered squat-feature array and runs the selected squat backend directly.</p>
+          <div class="chip-row">
+            <span class="chip ok">fastest</span>
+            <span class="chip ok">best smoke-test mode</span>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>How To Run</h2>
+      <div class="grid">
+        <article class="card">
+          <h3>From a video</h3>
+          <pre><code>source .venv/bin/activate
+python3 CV_Image_pose_detection/artifacts/3_Modeling/run_squat_counter.py \
+  --video-path CV_Image_pose_detection/Data/LLSP/video/valid/train3946.mp4 \
+  --output-json CV_Image_pose_detection/artifacts/3_Modeling/training_outputs/train3946_squat_runtime.json \
+  --pretty</code></pre>
+        </article>
+        <article class="card">
+          <h3>From saved squat features with the default TCN backend</h3>
+          <pre><code>source .venv/bin/activate
+python3 CV_Image_pose_detection/artifacts/3_Modeling/run_squat_counter.py \
+  --feature-path CV_Image_pose_detection/Data/LLSP/annotation_cleaned/squat_features/train3946_squat_features.npy \
+  --pretty</code></pre>
+        </article>
+        <article class="card">
+          <h3>Force the FSM reference path</h3>
+          <pre><code>source .venv/bin/activate
+python3 CV_Image_pose_detection/artifacts/3_Modeling/run_squat_counter.py \
+  --feature-path CV_Image_pose_detection/Data/LLSP/annotation_cleaned/squat_features/train3946_squat_features.npy \
+  --counter-backend fsm \
+  --pretty</code></pre>
+        </article>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>What It Returns</h2>
+      <div class="grid">
+        <article class="card">
+          <h3>Output JSON fields</h3>
+          <ul>
+            <li><code>prediction.pred_count</code>: primary squat rep estimate for the selected backend</li>
+            <li><code>prediction.raw_pred_count</code>: continuous TCN count before rounding when TCN is used</li>
+            <li><code>reference_predictions.fsm.event_frames</code>: detected rep-completion frames in the engineered sequence</li>
+            <li><code>reference_predictions.fsm.mean_conf</code>: lower-body pose confidence summary</li>
+            <li><code>backend_selection</code>: whether the runtime used the TCN directly or fell back to FSM</li>
+            <li><code>video_metadata</code>: fps, frame count, and duration when a video input is used</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>Interpretation</h3>
+          <p>This runtime should be presented as a squat-only research prototype. A practical expectation around <code>±1</code> to <code>±2</code> reps is defensible on typical clips, but hard cases can still fail because of framing, target ambiguity, or borderline repetition definitions.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Known Limits</h2>
+      <ul>
+        <li>It does not perform exercise recognition; the input is assumed to be a squat clip.</li>
+        <li>It does not expose the full routed system in one command.</li>
+        <li>The runtime is still squat-only even though it now defaults to the stronger saved squat TCN.</li>
+        <li>It is an offline prototype, not a production webcam or mobile application.</li>
+      </ul>
+    </section>
+  </div>
+</body>
+</html>

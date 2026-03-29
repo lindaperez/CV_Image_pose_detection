@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540" role="img" aria-labelledby="title desc">
+  <title id="title">Pose Overlay Demo on Google Drive</title>
+  <desc id="desc">Preview card linking to a Google Drive video that shows the pose overlay.</desc>
+  <defs>
+    <linearGradient id="bg3" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#111827"/>
+      <stop offset="100%" stop-color="#172554"/>
+    </linearGradient>
+    <linearGradient id="accent3" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#f59e0b"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="960" height="540" fill="url(#bg3)"/>
+  <circle cx="830" cy="120" r="170" fill="#38bdf8" fill-opacity="0.08"/>
+  <circle cx="120" cy="450" r="155" fill="#f59e0b" fill-opacity="0.08"/>
+
+  <rect x="74" y="72" width="812" height="396" rx="28" fill="#0b1220" fill-opacity="0.94" stroke="#334155" stroke-width="2"/>
+  <rect x="74" y="72" width="812" height="12" rx="6" fill="url(#accent3)"/>
+
+  <text x="118" y="150" fill="#dbeafe" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700" letter-spacing="2">GOOGLE DRIVE DEMO</text>
+  <text x="118" y="218" fill="#f8fafc" font-family="Arial, Helvetica, sans-serif" font-size="52" font-weight="700">Pose Overlay Video</text>
+  <text x="118" y="272" fill="#cbd5e1" font-family="Arial, Helvetica, sans-serif" font-size="24">Open the Drive-hosted demo showing the live pose overlay and count HUD.</text>
+
+  <g transform="translate(710 212)">
+    <circle cx="0" cy="0" r="76" fill="#ffffff" fill-opacity="0.10" stroke="#94a3b8" stroke-width="2"/>
+    <polygon points="-18,-34 42,0 -18,34" fill="#f8fafc"/>
+  </g>
+
+  <rect x="118" y="334" width="264" height="62" rx="31" fill="#f8fafc"/>
+  <text x="150" y="374" fill="#0f172a" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700">Open Drive Video</text>
+
+  <text x="118" y="444" fill="#94a3b8" font-family="Arial, Helvetica, sans-serif" font-size="21">External demo link with pose overlay.</text>
+</svg>

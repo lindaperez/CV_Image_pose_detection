@@ -5,6 +5,7 @@ import csv
 import json
 import math
 import random
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
@@ -21,7 +22,7 @@ except Exception as exc:  # pragma: no cover - runtime dependency guard
 try:
     import torch
     import torch.nn as nn
-    from torch.utils.data import DataLoader, Dataset
+    from torch.utils.data import DataLoader, Dataset, WeightedRandomSampler
 except Exception as exc:  # pragma: no cover - runtime dependency guard
     raise SystemExit(
         "PyTorch is required to train the squat TCN model. "
@@ -163,6 +164,36 @@ def load_feature_array(path: Path, target_len: int, drop_frame_idx: bool) -> np.
     return resample_sequence(arr, target_len=target_len)
 
 
+def time_warp_sequence(array: np.ndarray, max_scale_delta: float) -> np.ndarray:
+    if max_scale_delta <= 0.0 or array.shape[0] <= 1:
+        return array
+
+    scale = random.uniform(max(1.0 - max_scale_delta, 0.5), 1.0 + max_scale_delta)
+    src_x = np.linspace(0.0, 1.0, num=array.shape[0], dtype=np.float32)
+    warped_x = np.clip(((src_x - 0.5) / scale) + 0.5, 0.0, 1.0)
+    warped = np.empty_like(array, dtype=np.float32)
+    for feat_idx in range(array.shape[1]):
+        warped[:, feat_idx] = np.interp(warped_x, src_x, array[:, feat_idx]).astype(np.float32)
+    return warped
+
+
+def apply_training_augmentation(
+    array: np.ndarray,
+    *,
+    time_warp_range: float,
+    feature_noise_std: float,
+    frame_dropout_prob: float,
+) -> np.ndarray:
+    augmented = time_warp_sequence(array, max_scale_delta=time_warp_range)
+    if frame_dropout_prob > 0.0:
+        keep_mask = (np.random.rand(augmented.shape[0], 1) >= frame_dropout_prob).astype(np.float32)
+        augmented = augmented * keep_mask
+    if feature_noise_std > 0.0:
+        noise = np.random.normal(0.0, feature_noise_std, size=augmented.shape).astype(np.float32)
+        augmented = augmented + noise
+    return augmented.astype(np.float32, copy=False)
+
+
 def compute_feature_stats(arrays: Iterable[np.ndarray]) -> tuple[np.ndarray, np.ndarray]:
     stacked = np.concatenate(list(arrays), axis=0)
     mean = stacked.mean(axis=0, dtype=np.float64).astype(np.float32)
@@ -179,12 +210,20 @@ class SquatTCNDataset(Dataset):
         drop_frame_idx: bool,
         feature_mean: np.ndarray,
         feature_std: np.ndarray,
+        augment: bool = False,
+        time_warp_range: float = 0.0,
+        feature_noise_std: float = 0.0,
+        frame_dropout_prob: float = 0.0,
     ) -> None:
         self.samples = samples
         self.target_len = target_len
         self.drop_frame_idx = drop_frame_idx
         self.feature_mean = feature_mean
         self.feature_std = feature_std
+        self.augment = augment
+        self.time_warp_range = time_warp_range
+        self.feature_noise_std = feature_noise_std
+        self.frame_dropout_prob = frame_dropout_prob
 
     def __len__(self) -> int:
         return len(self.samples)
@@ -193,6 +232,13 @@ class SquatTCNDataset(Dataset):
         sample = self.samples[idx]
         arr = load_feature_array(sample.feature_path, self.target_len, self.drop_frame_idx)
         arr = (arr - self.feature_mean) / self.feature_std
+        if self.augment:
+            arr = apply_training_augmentation(
+                arr,
+                time_warp_range=self.time_warp_range,
+                feature_noise_std=self.feature_noise_std,
+                frame_dropout_prob=self.frame_dropout_prob,
+            )
         x = torch.from_numpy(arr)
         y = torch.tensor(sample.count, dtype=torch.float32)
         return x, y, sample.name
@@ -325,6 +371,12 @@ def write_csv(path: Path, fieldnames: list[str], rows: list[dict[str, object]]) 
         writer.writerows(rows)
 
 
+def build_balanced_count_sampler(samples: list[Sample]) -> WeightedRandomSampler:
+    count_freq = Counter(sample.count for sample in samples)
+    weights = torch.tensor([1.0 / count_freq[sample.count] for sample in samples], dtype=torch.double)
+    return WeightedRandomSampler(weights=weights, num_samples=len(samples), replacement=True)
+
+
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Train a squat-only TCN rep-count regressor.")
     parser.add_argument(
@@ -372,6 +424,30 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default="mae",
         choices=["mae", "rmse", "within_1"],
         help="Validation metric used for early stopping and best-checkpoint selection.",
+    )
+    parser.add_argument(
+        "--sampler",
+        default="shuffle",
+        choices=["shuffle", "balanced_count"],
+        help="Train sampling strategy. balanced_count upsamples rare rep-count targets.",
+    )
+    parser.add_argument(
+        "--time-warp-range",
+        type=float,
+        default=0.0,
+        help="Max relative temporal warp applied during training augmentation.",
+    )
+    parser.add_argument(
+        "--feature-noise-std",
+        type=float,
+        default=0.0,
+        help="Stddev of Gaussian noise added to normalized training features.",
+    )
+    parser.add_argument(
+        "--frame-dropout-prob",
+        type=float,
+        default=0.0,
+        help="Probability of dropping a whole timestep during training augmentation.",
     )
     return parser
 
@@ -433,6 +509,14 @@ def main() -> None:
         drop_frame_idx=drop_frame_idx,
         feature_mean=feature_mean,
         feature_std=feature_std,
+        augment=(
+            args.time_warp_range > 0.0
+            or args.feature_noise_std > 0.0
+            or args.frame_dropout_prob > 0.0
+        ),
+        time_warp_range=args.time_warp_range,
+        feature_noise_std=args.feature_noise_std,
+        frame_dropout_prob=args.frame_dropout_prob,
     )
     valid_ds = SquatTCNDataset(
         samples=valid_samples,
@@ -441,8 +525,17 @@ def main() -> None:
         feature_mean=feature_mean,
         feature_std=feature_std,
     )
+    train_eval_ds = SquatTCNDataset(
+        samples=train_samples,
+        target_len=args.seq_len,
+        drop_frame_idx=drop_frame_idx,
+        feature_mean=feature_mean,
+        feature_std=feature_std,
+    )
 
-    train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True)
+    train_sampler = build_balanced_count_sampler(train_samples) if args.sampler == "balanced_count" else None
+    train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=train_sampler is None, sampler=train_sampler)
+    train_eval_loader = DataLoader(train_eval_ds, batch_size=args.batch_size, shuffle=False)
     valid_loader = DataLoader(valid_ds, batch_size=args.batch_size, shuffle=False)
 
     device = choose_device(args.device)
@@ -513,7 +606,7 @@ def main() -> None:
     model.load_state_dict(best_state)
     model.to(device)
 
-    _, train_pred, train_true, train_names = run_epoch(model, train_loader, criterion, None, device)
+    _, train_pred, train_true, train_names = run_epoch(model, train_eval_loader, criterion, None, device)
     _, valid_pred, valid_true, valid_names = run_epoch(model, valid_loader, criterion, None, device)
     train_eval_pred = transform_predictions(train_pred, args.eval_transform)
     valid_eval_pred = transform_predictions(valid_pred, args.eval_transform)
@@ -553,6 +646,10 @@ def main() -> None:
         "loss": args.loss,
         "eval_transform": args.eval_transform,
         "selection_metric": args.selection_metric,
+        "sampler": args.sampler,
+        "time_warp_range": args.time_warp_range,
+        "feature_noise_std": args.feature_noise_std,
+        "frame_dropout_prob": args.frame_dropout_prob,
         "device": str(device),
         "drop_frame_idx": drop_frame_idx,
         "input_dim": input_dim,

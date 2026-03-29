@@ -1,0 +1,29 @@
+# OS and editor noise
+.DS_Store
+**/.DS_Store
+.ipynb_checkpoints/
+
+# Python cache files
+__pycache__/
+**/__pycache__/
+*.py[cod]
+
+# Raw datasets and local downloads
+Data/RepCountA.tar
+Data/LLSP/video/
+Data/Countix/video/
+
+# Large generated feature stores
+Data/LLSP/annotation_cleaned/pose_features/
+Data/LLSP/annotation_cleaned/pose_sequences/
+Data/LLSP/annotation_cleaned/rgb_resnet18_features/
+Data/LLSP/annotation_cleaned/rgb_resnet50_features/
+Data/LLSP/annotation_cleaned/squat_features/
+
+# Large EDA exports
+artifacts/1_EDA/*.pdf
+artifacts/1_EDA/pdfs/
+
+# Local checkpoints and model outputs
+artifacts/3_Modeling/yolo11n-pose.pt
+artifacts/3_Modeling/training_outputs/

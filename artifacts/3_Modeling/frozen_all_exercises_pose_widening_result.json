@@ -1,0 +1,46 @@
+{
+  "frozen_on": "2026-03-23",
+  "status": "official_current_widening_stage",
+  "task": "all-exercises pose extraction and generic pose-sequence preparation",
+  "scope": {
+    "dataset_contract": "RepCount Part-A style video set indexed through pose_feature_index.csv",
+    "remaining_worklist_policy": "pose_feature_index_remaining.csv built after excluding the heterogeneous 'others' label from the widening worklist",
+    "representation_goal": "generic normalized pose sequences for downstream multi-exercise repetition counting"
+  },
+  "stage_4_pose_extraction": {
+    "notebook": "artifacts/3_Modeling/4_All_Exercises_Pose_Extraction_Colab.ipynb",
+    "summary_metrics": {
+      "total_rows": 885,
+      "ok": 885,
+      "skipped_exists": 0,
+      "failed": 0,
+      "ok_with_zero_pose_frames": 0
+    },
+    "runtime_args": {
+      "index_csv": "Data/LLSP/annotation_cleaned/pose_feature_index_remaining.csv",
+      "video_dir": "Data/LLSP/video",
+      "feature_dir": "Data/LLSP/annotation_cleaned/pose_features",
+      "model": "artifacts/3_Modeling/yolo11n-pose.pt",
+      "conf": 0.25,
+      "imgsz": 640,
+      "device": "cuda:0",
+      "track_person": true,
+      "track_search_expand": 1.6,
+      "track_max_misses": 8,
+      "overwrite": true
+    }
+  },
+  "stage_5_pose_sequence_preparation": {
+    "script": "artifacts/3_Modeling/build_pose_sequence_dataset.py",
+    "notebook": "artifacts/3_Modeling/5_All_Exercises_Pose_Sequence_Preparation_Colab.ipynb",
+    "summary_metrics": {
+      "rows": 885,
+      "ok": 885,
+      "mean_valid_ratio": 0.9289256662718723,
+      "mean_whole_body_confidence": 0.719979074109072,
+      "mean_frames_total": 830.9706214689265
+    },
+    "note": "A torso-scale normalization warning ('All-NaN slice encountered') was observed during execution, but the final sequence-preparation summary reported 885/885 rows with status=ok."
+  },
+  "artifact_note": "The widening outputs were produced in Colab/Drive. The files listed in the paired artifact manifest should be preserved as the fixed reference point before any Stage 6 multi-exercise counting experiments begin."
+}

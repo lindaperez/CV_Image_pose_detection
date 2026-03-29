@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Live Squat Counter</title>
+  <style>
+    :root {
+      --bg: #eef3f1;
+      --panel: #fcfffd;
+      --ink: #15211c;
+      --muted: #53645b;
+      --line: #cbdad2;
+      --accent: #1d6b57;
+      --accent-soft: #dff2ec;
+      --shadow: 0 10px 28px rgba(16, 34, 28, 0.08);
+      --radius: 18px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top right, rgba(29, 107, 87, 0.10), transparent 30%),
+        linear-gradient(180deg, #f8fcfa 0%, var(--bg) 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .shell {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: grid;
+      gap: 18px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 22px;
+    }
+
+    .hero,
+    .grid,
+    .stats {
+      display: grid;
+      gap: 14px;
+    }
+
+    .hero {
+      grid-template-columns: 1.15fr 0.85fr;
+      align-items: start;
+    }
+
+    .grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .stats {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    h1, h2, h3 { margin: 0; line-height: 1.2; }
+    h1 { font-size: clamp(2rem, 4vw, 3rem); margin-bottom: 10px; }
+    h2 { font-size: 1.05rem; margin-bottom: 12px; }
+    h3 { font-size: 1rem; margin-bottom: 8px; }
+
+    p, li {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    ul {
+      padding-left: 18px;
+      margin: 0;
+    }
+
+    li + li {
+      margin-top: 6px;
+    }
+
+    .kicker {
+      display: inline-flex;
+      width: fit-content;
+      padding: 7px 12px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      border: 1px solid rgba(29, 107, 87, 0.20);
+      font-size: 0.88rem;
+      margin-bottom: 12px;
+    }
+
+    .links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    a.button {
+      border-radius: 999px;
+      padding: 10px 14px;
+      background: var(--ink);
+      color: #fff;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    a.button.secondary {
+      background: #e3efe9;
+      color: var(--ink);
+    }
+
+    .stat,
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: #fff;
+      padding: 16px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .stat strong {
+      display: block;
+      font-size: 1.5rem;
+      color: var(--accent);
+    }
+
+    pre {
+      margin: 0;
+      padding: 14px;
+      border: 1px solid #d9e7e1;
+      border-radius: 14px;
+      background: #f4faf7;
+      overflow: auto;
+      font-size: 0.9rem;
+      line-height: 1.45;
+    }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.92em;
+    }
+
+    @media (max-width: 1100px) {
+      .hero,
+      .grid,
+      .stats {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <section class="panel hero">
+      <div>
+        <span class="kicker">Live webcam prototype</span>
+        <h1>Live Squat Counter</h1>
+        <p>This page documents the live squat-only prototype: webcam input, frame-wise YOLO pose, tracked target selection, accumulated squat feature buffer, live TCN inference, and on-screen count display. It uses the same saved squat TCN as the offline runtime.</p>
+      </div>
+      <div class="links">
+        <a class="button secondary" href="../../index.html">Open home</a>
+        <a class="button secondary" href="./squat_runtime_dashboard.html">Open offline squat runtime</a>
+        <a class="button secondary" href="./architecture_results_dashboard.html">Open results hub</a>
+        <a class="button" href="./run_live_squat_counter.py" target="_blank" rel="noopener noreferrer">Open live script</a>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="stats">
+        <div class="stat">
+          <strong>YOLO</strong>
+          <span>Frame-wise pose frontend</span>
+        </div>
+        <div class="stat">
+          <strong>TCN</strong>
+          <span>Live counting backend</span>
+        </div>
+        <div class="stat">
+          <strong>R / Q</strong>
+          <span>Reset and quit controls</span>
+        </div>
+        <div class="stat">
+          <strong>Squat</strong>
+          <span>Only supported exercise</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>How It Works</h2>
+      <div class="grid">
+        <article class="card">
+          <h3>Pipeline</h3>
+          <ul>
+            <li>Read frames from a webcam.</li>
+            <li>Run YOLO pose on each frame with tracked-person selection.</li>
+            <li>Append detected pose frames to the current session buffer.</li>
+            <li>Rebuild squat features from the session buffer every few frames.</li>
+            <li>Run the saved squat TCN and display a stabilized count.</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>What is shown on screen</h3>
+          <ul>
+            <li>Current displayed squat count.</li>
+            <li>Raw and smoothed TCN prediction.</li>
+            <li>Tracked pose overlay and bounding box.</li>
+            <li>Detected pose frames, preview FPS, and session duration.</li>
+            <li>Tracking status, recording status, and active run name.</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Run It</h2>
+      <div class="grid">
+        <article class="card">
+          <h3>Default webcam run</h3>
+          <pre><code>source .venv/bin/activate
+python3 CV_Image_pose_detection/artifacts/3_Modeling/run_live_squat_counter.py \
+  --mirror \
+  --tcn-device cpu</code></pre>
+        </article>
+        <article class="card">
+          <h3>Choose a different camera or model device</h3>
+          <pre><code>source .venv/bin/activate
+python3 CV_Image_pose_detection/artifacts/3_Modeling/run_live_squat_counter.py \
+  --camera-index 1 \
+  --device mps \
+  --tcn-device mps \
+  --mirror</code></pre>
+        </article>
+        <article class="card">
+          <h3>Start recording immediately on launch</h3>
+          <pre><code>source .venv/bin/activate
+python3 CV_Image_pose_detection/artifacts/3_Modeling/run_live_squat_counter.py \
+  --mirror \
+  --tcn-device cpu \
+  --auto-record</code></pre>
+        </article>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Controls</h2>
+      <div class="grid">
+        <article class="card">
+          <h3>Live controls</h3>
+          <ul>
+            <li><code>Ctrl+S</code>: start recording the displayed live overlay to an <code>.mp4</code></li>
+            <li><code>e</code>: stop recording and save the current video</li>
+            <li><code>--auto-record</code>: begin recording immediately at launch without waiting for a keypress</li>
+            <li><code>r</code>: reset the live session buffer and count</li>
+            <li><code>q</code>: quit the live window</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>Saved recordings</h3>
+          <p>Unless you override <code>--recording-dir</code>, the videos are written under <code>artifacts/3_Modeling/training_outputs/live_squat_recordings</code>.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Important Limits</h2>
+      <div class="grid">
+        <article class="card">
+          <h3>What this is good for</h3>
+          <p>A local demonstration that the saved squat pose model can be turned into an interactive prototype, not just an offline notebook result.</p>
+        </article>
+        <article class="card">
+          <h3>What this is not</h3>
+          <p>It is not a production workout app. The live count is estimated from the accumulated session buffer, so framing problems, target switching, and borderline reps can still produce unstable or wrong counts.</p>
+        </article>
+      </div>
+    </section>
+  </div>
+</body>
+</html>

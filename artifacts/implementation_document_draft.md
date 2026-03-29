@@ -1,15 +1,22 @@
 # Exercise Recognition and Repetition Counting
 ## Working Draft
 
-This document is a step-by-step working draft for the project. It is intended to be updated incrementally as the implementation, evaluation, and project framing evolve.
+This document records the implementation, evaluation, and architectural decisions for the project. It has been updated incrementally as the pipeline and evidence base matured from a squat-only baseline into a multi-exercise comparative study.
 
 ---
 
 ## Document Status
 
 - Project goal: multi-exercise system for exercise recognition and repetition counting
-- Current implementation scope: first iteration focused on squat videos only
-- Current role of this iteration: validate the pose-based architecture, preprocessing pipeline, feature extraction strategy, and repetition-counting logic before scaling
+- Current implementation scope: squat-specific pose branch plus widened multi-exercise comparison stages
+- Current role of this iteration: validate the pose-based architecture, preprocessing pipeline, feature extraction strategy, repetition-counting logic, and the first exercise-dependent follow-up stages before scaling
+
+## Project Team
+
+- Linda Perez Penaranda
+- Kunyi Shi
+- Peihan Wang
+- Quanxing Lu
 
 ---
 
@@ -19,7 +26,7 @@ This document is a step-by-step working draft for the project. It is intended to
 
 Repetitive action counting is an important problem in computer vision and video understanding because many real-world human activities involve repeated motion over time. Examples include fitness exercises, rehabilitation routines, and sports drills, where accurate repetition counts are useful for progress tracking, adherence monitoring, and performance assessment.
 
-The long-term goal of this project is to build a multi-exercise system capable of both recognizing the exercise being performed and estimating repetition counts automatically from video. The current implementation is the first iteration of that system and focuses specifically on squat videos. This narrower prototype is used to validate the proposed pose-based architecture, preprocessing strategy, feature extraction pipeline, and repetition-counting approach before extending the system to additional exercises and broader deployment settings.
+The long-term goal of this project is to build a multi-exercise system capable of both recognizing the exercise being performed and estimating repetition counts automatically from video. The current implementation is no longer only a squat prototype. It now includes a frozen squat-specific pose branch, a widened shared pose-sequence branch across multiple exercises, a controlled RGB comparison branch on `squat`, `pull_up`, and `push_up`, a negative multimodal fusion result, and an exercise-dependent routed counting surface. The role of the current iteration is therefore to validate the upstream pose-first pipeline end to end and to determine which representation and counting strategy are most defensible for each supported exercise under realistic video difficulty.
 
 ### Notes to Update
 
@@ -46,25 +53,37 @@ Data Cleaning / Relabeling
 Prepared Cleaned Annotations
             |
             v
-Pose Index Generation
+Pose / Video Index Contracts
             |
             v
-Pose Estimation (YOLO Pose)
+Pose Estimation (YOLO Pose) ------------------------------+
             |
-            v
-Raw Temporal Pose Features [T, 51]
-            |
-            v
-Pose Postprocessing + Feature Engineering
-            |
-            v
-Squat-Specific Temporal Features
-            |
-            v
-Repetition Counting (FSM / future alternatives)
-            |
-            v
-Predictions + Evaluation
+            v                                            |
+Raw Temporal Pose Features [T, 51]                       |
+            |                                            |
+   +--------+-------------------------+                  |
+   |                                  |                  |
+   v                                  v                  v
+Generic Pose Sequence Preparation   Squat-Specific    RGB Frame Sampling
+and Normalization                   Feature Engineering + Frozen CNN Features
+   |                                  |                  |
+   v                                  v                  v
+Shared Pose TCN / Transformer       Squat FSM /       RGB TCN / Stronger RGB
+Per-Exercise Tuning                 Squat TCN         Comparison Branch
+   |                                  |                  |
+   +--------------------+-------------+---------+--------+
+                        |                       |
+                        v                       v
+             Representation Audit / Hard-Case Analysis
+                        |
+                        v
+             Optional Multimodal Fusion Comparison
+                        |
+                        v
+             Exercise-Dependent Routed Counting Output
+                        |
+                        v
+                 Predictions + Evaluation
 ```
 
 ### Stage-by-Stage Description
@@ -72,40 +91,21 @@ Predictions + Evaluation
 #### Stage 1. Exploratory Data Analysis (EDA)
 
 **Purpose**
-- Understand the dataset structure and identify quality issues before modeling.
+- Understand the dataset structure and identify issues that would invalidate direct modeling.
 
 **What was done**
-- Verified the downloaded Part-A total against the expected dataset size.
-- Confirmed the split sizes:
+- Verified the expected Part-A total and split sizes:
   - `758` train
   - `131` valid
   - `152` test
   - `1041` total videos
-- Inspected class distribution, repetition-count distribution, duration variation, label consistency, and temporal annotation structure through the `L1-L302` columns.
-- Excluded the test split from analytical decisions and used it only for size verification and typo cleaning.
-- Reviewed videos manually to identify ambiguous or suspicious labels, especially inside the `others` class.
-- In particular, manually reviewed all `37` videos in the `others` class.
-- The manual review found that `others` included multiple distinct motion groups, including:
-  - soccer juggling / ball control
-  - indoor rowing / rowing erg
-  - on-water rowing
-  - one squat sample
-- Generated visual inspection artifacts such as `others_inspection.pdf` and per-class inspection PDFs.
+- Reviewed class distribution, count distribution, duration variability, sparse temporal annotation structure, and obvious label noise.
+- Manually inspected the heterogeneous `others` class and generated inspection artifacts.
+- Identified one row with missing `count` in `train + valid`, strong count skew, and broad exercise imbalance in the cleaned train split.
 
 **Current conclusion**
-- The raw dataset was not ready to use directly.
-- EDA revealed:
-  - annotation inconsistencies
-  - typo and naming issues
-  - ambiguous classes such as `others`
-  - strong class imbalance
-  - high repetition-count variability and outliers
-  - one row with missing `count` in `train + valid`
-- EDA confirmed that a cleaning and relabeling stage was necessary before modeling.
-- A key insight from inspecting `others` was that the videos were not exact duplicates, but they formed same-type clusters. This showed that `others` was a noisy and heterogeneous category, so keeping all of those videos inside one generic class would likely hurt future exercise classification quality.
-
-**To update**
-- Add selected EDA figures if needed.
+- The raw annotations were not ready to use directly.
+- The main issues were label inconsistency, ambiguous classes, long-tailed repetition counts, and a small number of missing or questionable labels.
 
 #### Stage 2. Data Cleaning and Relabeling
 
@@ -139,9 +139,6 @@ Predictions + Evaluation
 - The dataset required both automatic typo normalization and manual semantic review.
 - The EDA process did not only clean spelling, it materially changed the usable class structure.
 - The `others` review demonstrated that a single catch-all class can hide meaningful clusters of exercises or motion patterns. Treating such a heterogeneous group as one class would likely degrade both exercise recognition and any later multi-exercise extension of the system.
-
-**To update**
-- Add a pointer to the decisions manifest if needed.
 
 #### Stage 3. Data Preparation
 
@@ -180,188 +177,143 @@ Predictions + Evaluation
 - This stage formalized the curation policy instead of leaving cleaning decisions implicit inside analysis code.
 - It also added guardrails against split leakage before modeling.
 
-**To update**
-- Final cleaned counts from the EDA summary:
-  - `732` train
-  - `131` valid
-  - `152` test
-  - `10` action classes
-
-#### Stage 4. Pose Index Generation
+#### Stage 4. Pose Extraction and Indexing
 
 **Purpose**
-- Define which videos will be processed and where outputs will be written.
+- Convert videos into persistent per-video pose arrays and define reusable indexing contracts.
 
 **What was done**
-- Built pose index CSV files from the cleaned annotations, including a squat-only index for the first implementation.
-- Prepared the squat-only worklist used by **Colab 4**, which performs the pose-extraction stage.
-- In Colab 4, generated `pose_feature_index_squat.csv` and pointed the output feature paths to the persistent Google Drive artifact location rather than ephemeral Colab storage.
-- Verified the planned workload before extraction by checking the row count of the squat index.
-- Confirmed that the final squat-only index contained `118` videos.
-- Used the following Drive-backed contract in Colab 4:
-  - `Data/LLSP/annotation_cleaned/pose_feature_index_squat.csv`
-  - `Data/LLSP/annotation_cleaned/pose_features/`
-
-**Current conclusion**
-- The squat subset can be processed as a clean first-iteration problem.
-- This stage created the contract between cleaned annotations and the GPU-based pose-extraction run.
-- Using a Drive-backed index and output path made the pose stage reproducible across Colab sessions and established the handoff contract for later stages.
-
-#### Stage 5. Pose Estimation
-
-**Purpose**
-- Convert raw videos into temporal human-pose sequences.
-
-**What was done**
-- Used a pretrained YOLO Pose model to extract 17 keypoints per frame.
-- Stored each frame as 51 values: `x`, `y`, and confidence for each keypoint.
-- Ran this stage in **Colab 4**.
-- Used **GPU inference** because pose extraction requires running the pretrained YOLO model on every frame of every video, which is computationally expensive even though the model is not being trained.
-- GPU was used to accelerate frame-by-frame pose inference and make full squat-subset extraction feasible within the project timeline.
-- Verified in Colab 4 that CUDA was available and ran inference on `cuda:0`.
-- Started with a smoke test on `5` videos before launching the full extraction run.
-- After the smoke test, ran the full extraction on the squat subset indexed from the cleaned annotations.
-- The full run processed `118` squat videos and saved per-video pose arrays to the Drive-backed `pose_features` directory.
-- The extraction report showed `status = ok` for all `118` rows.
-- The saved report structure confirmed:
-  - `feat_dim = 51` for all videos
-  - `frames_total` ranged from `100` to `2550`
-  - `frames_used` ranged from `100` to `2550`
-  - the report `message` field was blank for successful rows, which appears as `NaN` when loaded with pandas defaults
-- The synced local summary now matches the Colab 4 full run:
-  - `total_rows = 118`
-  - `ok = 118`
-  - `skipped_exists = 0`
-  - `failed = 0`
-  - `ok_with_zero_pose_frames = 0`
-- From the synced local report:
-  - mean `frames_total` = `888.6`
-  - mean `frames_used` = `885.09`
-  - `16` videos had `frames_used < frames_total`, indicating minor frame-level pose misses but not extraction failure
-
-**Current conclusion**
-- The pose-based architecture is viable for the squat subset.
-- Using Colab 4 with GPU was an implementation choice for efficiency, not because a new pose model was being trained.
-- The smoke test reduced execution risk before the full run.
-- The full Colab 4 result showed that pose extraction was not the blocking part of the current pipeline: the squat subset completed successfully with complete per-video feature generation and no failed videos.
-
-**Current evidence**
-- Pose extraction summary and report exist under `Data/LLSP/annotation_cleaned`.
-- The primary artifacts created or updated by Colab 4 are:
+- Built pose index contracts for:
+  - the initial squat-only branch
+  - the widened all-exercises branch
+- Used YOLO Pose in Colab with GPU inference to extract 17 keypoints per frame and save raw pose arrays.
+- Produced persistent Drive-backed artifacts such as:
   - `pose_feature_index_squat.csv`
-  - `pose_extraction_report.csv`
-  - `pose_extraction_summary.json`
+  - `pose_feature_index.csv`
   - `pose_features/*.npy`
-
-#### Stage 6. Pose Postprocessing and Feature Engineering
-
-**Purpose**
-- Turn raw keypoints into more stable and interpretable squat signals.
-
-**What was done**
-- Ran this stage in **Colab 5** after Colab 4 pose extraction had completed.
-- Read the Drive-backed squat pose index from `pose_feature_index_squat.csv` and the raw pose arrays from `pose_features/*.npy`.
-- Wrote the processed outputs back to Drive so the next notebook could consume persistent feature artifacts across sessions.
-- Generated squat-specific temporal features such as knee flexion, hip drop, confidence-related support, and other lower-body signals.
-- Performed a single-video inspection before the full batch run to verify that the feature helpers behaved sensibly before scaling to all squat videos.
-- Processed the full squat subset and saved:
-  - `squat_features/*.npy`
-  - `squat_feature_index.csv`
-  - `squat_feature_summary.csv`
-- The batch run completed for all `118` rows, with `status = ok` for every processed video.
-- The saved summary confirms:
-  - `118` rows
-  - `118` `ok`
-  - mean `frames_valid` = `872.042372881356`
-  - mean `mean_conf` = `0.9408578704726898`
-  - `frames_valid` range = `77` to `2550`
-  - `mean_conf` range = `0.23204709589481354` to `0.9987007975578308`
-- In this summary:
-  - `frames_valid` means the number of frames in a video whose lower-body pose signal remained usable after the feature-stage validity checks.
-  - mean `frames_valid = 872.042372881356` means that, on average, each squat video contributed about `872` usable frames to downstream repetition counting.
-  - `mean_conf` is the average lower-body confidence score used by the squat feature pipeline, not a generic whole-body confidence.
-  - mean `mean_conf = 0.9408578704726898` means that the extracted squat features were built from strong lower-body detections in most videos.
-- The local synced workspace now contains:
-  - `118` engineered squat feature `.npy` files under `Data/LLSP/annotation_cleaned/squat_features`
-  - `squat_feature_index.csv`
-  - `squat_feature_summary.csv`
+  - extraction summaries and reports
 
 **Current conclusion**
-- Raw pose alone is not the most usable representation for counting.
-- Engineered squat features provide a clearer signal for downstream repetition logic.
-- Colab 5 completed successfully for the full squat subset, so feature engineering is no longer a blocking stage.
-- The high mean lower-body confidence and large average valid-support signal indicate that the counting stage is operating on mostly strong downstream features rather than severely degraded pose inputs.
-- This stage also established the contract for Colab 6, which reads `squat_feature_index.csv` and `squat_features/*.npy` for repetition counting.
+- Pose extraction is operational and not the main project bottleneck.
+- The pose front end is now stable enough to support multiple downstream branches.
 
-#### Stage 7. Repetition Counting
+#### Stage 5. Pose Representation Preparation
 
 **Purpose**
-- Estimate the number of squat repetitions from engineered temporal features.
+- Build the two pose representations used by the project:
+  - squat-specific engineered features
+  - generic normalized pose sequences
 
 **What was done**
-- Ran this stage in **Colab 6** using the engineered squat features produced by Colab 5.
-- Used an FSM-based counter over squat movement phases instead of a learned end-to-end repetition-count model.
-- Counted repetitions from the temporal squat features and saved the baseline per-video predictions to:
-  - `squat_rep_count_results.csv`
-- Computed the baseline rep-count evaluation metrics from those saved predictions.
-- Performed threshold tuning on the `train` split only so that `valid` could remain the main honest check of generalization.
-- Saved the tuning search output to:
-  - `squat_rep_tuning_results.csv`
-- Reran the counter with the best train-selected thresholds and saved the tuned per-video predictions to:
-  - `squat_rep_count_results_tuned.csv`
-- The synced local tuning table currently contains `144` candidate configurations.
-- The best saved train-selected threshold set in the synced local outputs is:
-  - `min_conf = 0.25`
-  - `min_valid_ratio = 0.5`
-  - `enter_down = 25.0`
-  - `enter_bottom = 45.0`
-  - `exit_bottom = 30.0`
-  - `back_to_up = 20.0`
-  - `min_bottom_frames = 2`
-- The synced baseline results currently show:
-  - overall rows = `118`
-  - overall `MAE = 3.9745762711864407`
-  - overall `RMSE = 6.9581070872248105`
-  - overall `Within-1 = 0.559322033898305`
-- The synced tuned results currently show:
-  - `valid` rows = `16`
-  - `valid MAE = 3.0625`
-  - `valid RMSE = 4.9180788932265`
-  - `valid Within-1 = 0.5625`
-  - `train` rows = `102`
-  - `train MAE = 2.303921568627451`
-  - `train RMSE = 4.7309991482958935`
-  - `train Within-1 = 0.6764705882352942`
+- For the squat branch:
+  - engineered lower-body features such as knee flexion, hip drop, and validity / confidence support
+  - exported `squat_features/*.npy`, `squat_feature_index.csv`, and `squat_feature_summary.csv`
+- For the widened branch:
+  - normalized and resampled raw pose arrays into a shared temporal sequence contract
+  - exported `pose_sequence_index.csv` and `pose_sequence_summary.csv`
 
 **Current conclusion**
-- Pose-derived repetition counting is feasible.
-- The main remaining challenge is counting quality and calibration, not raw pose extraction.
-- The current FSM backend is working end to end, but it still requires calibration and does not yet remove the need for exercise-specific tuning.
-- The tuned results are better than the untuned baseline in the synced local artifacts, which supports the decision to keep validation separate from train during tuning.
-- The main bottleneck has now moved from data generation to counting robustness and eventual scaling beyond squat.
-- A later squat-only learned experiment using a TCN regressor also showed that the counting backend can be replaced without changing the upstream pose and feature pipeline.
-- After controlled and targeted tuning in `6_TCN_Training_Colab.ipynb`, the best balanced learned squat run became `squat_tcn_l1_channels96_dropout01`.
-- That learned branch improved validation `MAE` and `RMSE` relative to the current synced FSM result while remaining competitive on `Within-1`, which strengthens the case for moving from handcrafted counting toward learned temporal modeling in later iterations.
+- The project now supports both:
+  - a high-performance exercise-specific pose branch for squat
+  - a reusable generic pose representation for shared and per-exercise learned models
 
-#### Stage 8. Output and Evaluation
+#### Stage 6. Pose Counting Baselines and Ablations
 
 **Purpose**
-- Measure whether the first-iteration system produces useful results.
+- Establish what pose-only counting can achieve before moving to RGB or multimodal comparisons.
 
 **What was done**
-- Generated per-stage outputs, saved per-video prediction files, and computed rep-count evaluation metrics.
-- Persisted the main Colab 6 result artifacts locally under `Data/LLSP/annotation_cleaned`:
-  - `squat_rep_count_results.csv`
-  - `squat_rep_tuning_results.csv`
-  - `squat_rep_count_results_tuned.csv`
-- The notebook also includes logic to write:
-  - `squat_rep_metrics_summary.csv`
-  but that summary CSV is not yet present in the synced local workspace, which suggests the final metrics-export cell may not have been rerun after the notebook change.
+- Built the first squat counting branch:
+  - FSM baseline over engineered squat features
+  - tuned FSM
+  - learned squat TCN replacements
+- Froze the strongest learned squat baseline:
+  - `squat_tcn_l1_channels96`
+- Widened counting to all supported exercises with a shared normalized-pose TCN baseline.
+- Ran exercise-by-exercise ablations:
+  - `6B` sequence-length sweep
+  - `6C` keypoint weighting
+  - `6D` density counting
 
 **Current conclusion**
-- The current implementation is a functional validation prototype, not only a conceptual design.
-- The project now has saved evidence for both an untuned baseline and a tuned FSM result, which is enough to support a first-iteration evaluation narrative.
-- The remaining documentation task is mainly synchronization and presentation rather than a missing counting implementation.
+- Pose-only counting is viable, but the results are strongly exercise-dependent.
+- The dedicated squat pose branch is clearly strong.
+- The widened shared pose branch is useful as a baseline, not as a final generic solution.
+
+#### Stage 7. RGB Branch, Representation Analysis, and Multimodal Check
+
+**Purpose**
+- Test whether raw visual information recovers counting signal that pose misses.
+
+**What was done**
+- Extracted frozen RGB frame-feature sequences and trained RGB TCN baselines on:
+  - `squat`
+  - `pull_up`
+  - `push_up`
+- Strengthened the RGB branch with a frozen `ResNet50` backbone in `7B`.
+- Ran `7C` representation-fit analysis and `7D` hard-case audit to study when RGB helps.
+- Tested simple late fusion in `7E`.
+
+**Current conclusion**
+- RGB is useful, but not uniformly.
+- The evidence is now:
+  - `squat`: pose-first
+  - `push_up`: RGB-first
+  - `pull_up`: mixed
+- Simple late fusion did not beat the better single-modality branch consistently, so it is treated as a negative-but-informative result.
+
+#### Stage 8. Exercise-Dependent Routed Counting
+
+**Purpose**
+- Build a practical counting surface without forcing a single shared architecture to win every exercise.
+
+**What was done**
+- Routed each supported exercise to the strongest current branch:
+  - `squat -> squat_tcn_l1_channels96`
+  - `pull_up -> pose_count_tcn_pull_up_seq192`
+  - `push_up -> rgb_count_tcn_push_up_seq128`
+- Exported routed predictions and routed metrics summaries.
+
+**Current conclusion**
+- The most defensible practical output of the project so far is an exercise-dependent counter, not a universal shared model.
+
+#### Stage 9. Pose Transformer and Augmentation Ablation
+
+**Purpose**
+- Test whether a transformer encoder over generic normalized pose sequences improves on the shared pose TCN, and whether the current pose augmentation helps.
+
+**What was done**
+- Added a pose-transformer branch on the same generic pose-sequence contract used by Stage 6.
+- Added `9B` to compare augmentation on versus off under otherwise matched transformer settings.
+- Fixed the trainer contract so saved train metrics now come from deterministic full-train evaluation loaders rather than sampled or augmented training loaders.
+
+**Current conclusion**
+- This stage closed as a negative-but-informative architectural check on the generic pose branch.
+- The transformer did not beat the shared pose TCN on the practical tradeoff for the supported exercises.
+- The `9B` augmentation ablation showed no robust validation benefit:
+  - `pull_up` got slightly better `MAE` but much worse `Within-1`
+  - `push_up` was effectively unchanged
+  - `squat` was effectively unchanged
+- This branch does not replace the frozen dedicated squat baseline or the exercise-dependent routed conclusion.
+
+#### Stage 10. Dedicated Pull-Up Pose Follow-Up
+
+**Purpose**
+- Start the first exercise-specific pose follow-up beyond squat.
+
+**What was done**
+- Added a dedicated `pull_up` tuning stage on the shared Stage 5 pose sequences.
+- Compared dedicated pull-up pose candidates directly against:
+  - the saved shared pose baseline
+  - the saved RGB baselines for `pull_up`
+
+**Current conclusion**
+- This stage was informative, but not decisive.
+- The best dedicated `pull_up` candidate reduced `MAE` to `3.5463`, but its `Within-1` dropped to `0.2857`.
+- No dedicated `pull_up` candidate beat the current practical tradeoff established by:
+  - shared pose on `Within-1`
+  - stronger RGB on `MAE`
+- So `pull_up` remains mixed rather than becoming a clear pose-specialized win.
 
 ---
 
@@ -380,7 +332,7 @@ Predictions + Evaluation
 ### Development Setup
 
 - Local repository for scripts and documentation
-- Colab notebooks for stages 4, 5, and 6
+- Colab notebooks for the staged branches from pose extraction through routed counting and dedicated follow-up experiments
 - CSV / JSON / NPY artifacts passed between stages
 
 ### Why These Tools Were Chosen
@@ -390,11 +342,6 @@ Predictions + Evaluation
 - Good fit for a staged, inspectable pipeline
 - Practical for a first validation iteration
 
-### To Update
-
-- Add exact package versions if needed
-- Add any final Colab / hardware notes
-
 ---
 
 ## 4. Initial Implementation Progress
@@ -402,10 +349,19 @@ Predictions + Evaluation
 ### Implemented Components
 
 - Data loading from cleaned annotations
-- Squat-only index generation
+- Pose index generation for both squat-specific and widened branches
 - Pose extraction pipeline
 - Squat feature-extraction pipeline
+- Generic pose-sequence preparation pipeline
 - FSM-based repetition-counting baseline
+- Shared pose TCN baseline and ablations
+- RGB comparison branch and stronger RGB backbone branch
+- Representation-fit and hard-case audit branches
+- Multimodal late-fusion comparison
+- Exercise-dependent routed counting surface
+- Pose-transformer and augmentation-ablation evaluation
+- Dedicated pull-up pose-tuning stage
+- Experiment showcase and registry artifacts
 - Saved reports and metric artifacts
 
 ### Current Progress Summary
@@ -413,14 +369,15 @@ Predictions + Evaluation
 - Upstream data preparation: working
 - Pose extraction: working
 - Squat feature extraction: working
+- Generic pose-sequence preparation: working
 - Rep-count evaluation: working
-- Multi-exercise recognition: not yet implemented in the current iteration
+- Pose vs RGB comparison branch: working
+- Representation audits: working
+- Exercise-dependent counting comparisons: working
+- Routed counting prototype: working
+- Dedicated `pull_up` follow-up stage: completed, informative, but not decisive
+- Exercise recognition as a separate deployed stage: not yet implemented
 - Cleaned artifacts are versioned through a preparation-stage manifest and exported CSV contract
-
-### To Update
-
-- Add the latest final status after each rerun
-- Add screenshots or result tables if needed
 
 ---
 
@@ -429,7 +386,10 @@ Predictions + Evaluation
 ### Dataset Used
 
 - RepCount / LLSP-style exercise-video setup
-- Current implementation begins with squat as the first validated class
+- LLSP dataset access link:
+  - https://drive.google.com/drive/folders/1NUiY4bCTy_zGmJ8AECBcAIpqee5g8F_g?usp=sharing
+- Current implementation includes a frozen squat-specific branch plus widened multi-exercise pose and RGB comparison stages
+- Countix onboarding scaffolding has now been added as a separate benchmark branch under `Data/Countix`; it is currently deferred and is not part of the active training results in this draft
 
 ### Important Findings From EDA
 
@@ -475,11 +435,6 @@ Predictions + Evaluation
 - preservation of configurable class-exclusion hooks for later experiments
 - pose index generation
 
-### To Update
-
-- Add any final per-class cleaned counts if needed
-- Add final explanation of `LLSP` naming if needed
-
 ---
 
 ## 6. Existing Work and Research Gap
@@ -498,38 +453,43 @@ The current project does not aim to reproduce state-of-the-art counting immediat
 
 ### Classic References
 
-| Method | Type | Pros | Cons | Best use | Feasibility for this project |
-|---|---|---|---|---|---|
-| `RepNet (CVPR 2020)` | Direct video repetition counting | Class-agnostic counting, direct video-to-count pipeline, no handcrafted exercise rules | Less interpretable, different data/evaluation setup from current repo, weaker fit for future exercise recognition | Pure video-based repetition-count prediction | Good benchmark reference, low practicality for current implementation |
-| `Context-Aware and Scale-Insensitive Temporal Repetition Counting (CVPR 2020)` | Direct video repetition counting | Addresses changing repetition speed, strong historical counting reference | Older architecture family, not well aligned with the broader pose-based multi-exercise plan | Historical and methodological reference | Useful for literature review, low implementation priority |
-| `TransRAC (CVPR 2022)` | Direct video repetition counting with transformers and density regression | Strong RepCount relevance, better handling of long and realistic videos, stronger than early counting baselines | Higher implementation complexity, less interpretable, different assumptions from current repo | Research-style direct counting on RepCount-like data | High relevance as prior work, moderate to low implementation feasibility here |
-| `ST-GCN / 2s-AGCN` | Skeleton-based action recognition | Natural fit for pose data, good bridge from YOLO to learned temporal modeling, better scaling than FSM | Older than newer skeleton literature, more engineering than TCN | Learned action recognition and count prediction from pose sequences | Realistic next-step family, but heavier than a simple baseline |
+| Method | Type | Dataset / scale | Pros | Cons | Best use | Feasibility for this project |
+|---|---|---|---|---|---|---|
+| `RepNet (CVPR 2020)` | Direct video repetition counting | `Countix`: about `8.8k` videos / `422` classes; also evaluated on `QUVA Repetition` (`100` videos) and periodicity benchmarks | Class-agnostic counting, direct video-to-count pipeline, no handcrafted exercise rules | Less interpretable, different data/evaluation setup from current repo, weaker fit for future exercise recognition | Pure video-based repetition-count prediction | Good benchmark reference, low practicality for current implementation |
+| `Context-Aware and Scale-Insensitive Temporal Repetition Counting (CVPR 2020)` | Direct video repetition counting | `UCFRep`: `526` videos; also evaluated on older small benchmarks such as `YTSeg` (`100`) and `QUVA Repetition` (`100`) | Addresses changing repetition speed, strong historical counting reference | Older architecture family, not well aligned with the broader pose-based multi-exercise plan | Historical and methodological reference | Useful for literature review, low implementation priority |
+| `TransRAC (CVPR 2022)` | Direct video repetition counting with transformers and density regression | `RepCount`: `1,451` videos with about `20k` cycle annotations (`Part-A 1,041`, `Part-B 410`) | Strong RepCount relevance, better handling of long and realistic videos, stronger than early counting baselines | Higher implementation complexity, less interpretable, different assumptions from current repo | Research-style direct counting on RepCount-like data | High relevance as prior work, moderate to low implementation feasibility here |
+| `ST-GCN / 2s-AGCN` | Skeleton-based action recognition | Typically reported on skeleton action-recognition sets such as `NTU RGB+D 60` (`56,880` sequences / `60` classes) and `Kinetics-Skeleton` (`240,436` train + `19,796` val / `400` classes) | Natural fit for pose data, good bridge from YOLO to learned temporal modeling, better scaling than FSM | Older than newer skeleton literature, more engineering than TCN | Learned action recognition and count prediction from pose sequences | Realistic next-step family, but heavier than a simple baseline |
+
+`ST-GCN / 2s-AGCN` are primarily skeleton action-recognition references rather than repetition-counting papers, so their dataset scale is not directly comparable to `Countix`, `UCFRep`, or `RepCount`.
 
 ### Recent References (2023-Present)
 
-| Method | Type | Pros | Cons | Best use | Feasibility for this project |
-|---|---|---|---|---|---|
-| `SkeleTR (ICCV 2023)` | Skeleton-based action recognition | More modern pose-sequence backbone, better aligned with shared multi-exercise learning | More research-oriented, more complex than TCN | Multi-exercise pose-sequence learning in realistic settings | Moderate feasibility, good next-iteration reference |
-| `Skeleton-in-Context (CVPR 2024)` | Unified skeleton sequence modeling | Supports one shared representation across tasks, conceptually strong for multi-exercise learning | Experimental, less straightforward to reproduce quickly | Research-oriented shared skeleton representation learning | Good inspiration, lower immediate feasibility |
-| `BlockGCN (CVPR 2024)` | Skeleton-based action recognition | Newer graph-based pose modeling, more up to date than only citing classic graph baselines | More engineering effort than TCN, still heavier than needed for the fastest next step | Strong modern graph-based skeleton modeling | Reasonable future option, not the fastest first build |
-| `Motion Feature Learning (WACV 2024)` | Direct video repetition counting | Strong modern counting reference, improves robustness by modeling motion explicitly | Still RGB-centric, less aligned with the current pose-first repo | Modern direct video-counting benchmark reference | Useful literature reference, low direct implementation fit |
-| `Every Shot Counts / ESCounts (ACCV 2024)` | Direct video repetition counting | Strong recent performance, good reference for direct counting capability | More complex, less interpretable, weaker fit for pose-first multi-exercise plans | Research comparison for direct counting from video | Strong comparison point, but not the most practical implementation target |
-| `CountLLM (CVPR 2025)` | Direct repetitive-action counting with multimodal / LLM-style architecture | Very recent, strong generalization motivation, cutting-edge reference | Highest complexity, poor fit for a compact engineering iteration | Research frontier reference | Low near-term feasibility, high literature value |
+| Method | Type | Dataset / scale | Pros | Cons | Best use | Feasibility for this project |
+|---|---|---|---|---|---|---|
+| `SkeleTR (ICCV 2023)` | Skeleton-based action recognition | Mixed wild skeleton benchmarks including `Kinetics-Skeleton` (`240,436` train + `19,796` val / `400` classes), `AVA` (`430` 15-minute videos / `80` actions), and `Volleyball` (`55` videos) | More modern pose-sequence backbone, better aligned with shared multi-exercise learning | More research-oriented, more complex than TCN | Multi-exercise pose-sequence learning in realistic settings | Moderate feasibility, good next-iteration reference |
+| `Skeleton-in-Context (CVPR 2024)` | Unified skeleton sequence modeling | Multi-task skeleton benchmarks including `Human3.6M` (`3.6M` poses / `15` actions), `AMASS` (`40+` hours, `300+` subjects, `11k+` motions), and `3DPW` (`60` sequences, `51k+` frames) | Supports one shared representation across tasks, conceptually strong for multi-exercise learning | Experimental, less straightforward to reproduce quickly | Research-oriented shared skeleton representation learning | Good inspiration, lower immediate feasibility |
+| `BlockGCN (CVPR 2024)` | Skeleton-based action recognition | Large skeleton action-recognition sets such as `NTU RGB+D 60` (`56,880` sequences / `60` classes) and `NTU RGB+D 120` (`114,480` sequences / `120` classes) | Newer graph-based pose modeling, more up to date than only citing classic graph baselines | More engineering effort than TCN, still heavier than needed for the fastest next step | Strong modern graph-based skeleton modeling | Reasonable future option, not the fastest first build |
+| `Motion Feature Learning (WACV 2024)` | Direct video repetition counting | `RepCount` (`1,451` videos) and `UCFRep` (`526` videos), plus cross-dataset evaluation | Strong modern counting reference, improves robustness by modeling motion explicitly | Still RGB-centric, less aligned with the current pose-first repo | Modern direct video-counting benchmark reference | Useful literature reference, low direct implementation fit |
+| `Every Shot Counts / ESCounts (ACCV 2024)` | Direct video repetition counting | `RepCount` (`1,451` videos), `UCFRep` (`526` videos), and `Countix` (about `8.8k` videos / `422` classes) | Strong recent performance, good reference for direct counting capability | More complex, less interpretable, weaker fit for pose-first multi-exercise plans | Research comparison for direct counting from video | Strong comparison point, but not the most practical implementation target |
+| `CountLLM (CVPR 2025)` | Direct repetitive-action counting with multimodal / LLM-style architecture | Pretraining on `WebVid-10M`, then RAC benchmarks `RepCount` (`1,451` videos), `UCFRep` (`526` videos), and `Countix` (about `8.8k` videos / `422` classes) | Very recent, strong generalization motivation, cutting-edge reference | Highest complexity, poor fit for a compact engineering iteration | Research frontier reference | Low near-term feasibility, high literature value |
+
+The first three recent references are pose- or skeleton-modeling papers rather than repetition-counting papers, so their benchmark scale is shown for representation-learning context rather than as a directly comparable counting dataset.
 
 ### Practical Interpretation For This Project
 
-- The **current squat prototype** was best served by a practical and inspectable pose-based pipeline, not by jumping immediately to the most complex direct video-counting model.
-- For the **next iteration**, the most suitable direction is still likely:
-  - keep YOLO Pose
-  - stop handcrafting exercise-specific logic
-  - train one shared temporal model across exercises
-- In that context, the most feasible implementation choices are:
-  - `TCN / 1D CNN` as the fastest learned baseline
-  - `ST-GCN / 2s-AGCN` or newer skeleton models as stronger longer-term pose-native options
+- The project is no longer best described as a single squat prototype or as a search for one generic counter.
+- The completed experiments support an **exercise-dependent interpretation**:
+  - `squat` is best handled by the dedicated pose branch
+  - `push_up` is best handled by the RGB branch
+  - `pull_up` remains mixed even after the dedicated pose follow-up
+- In that context, the most defensible practical output is now:
+  - keep YOLO Pose as the reusable structured frontend
+  - keep RGB as the complementary branch where pose underperforms
+  - route each supported exercise to the branch that actually earned its place experimentally
 - Direct video methods such as `RepNet`, `TransRAC`, `ESCounts`, and `CountLLM` remain important references, but they are better treated as:
   - literature context
-  - evaluation baselines for comparison
-  - possible future alternatives if the project later shifts away from pose-based modeling
+  - upper-bound style comparison points
+  - possible future alternatives if the project later shifts toward video-native counting
 
 ### Why RepNet / TransRAC Were Not Used In The First Iteration
 
@@ -549,9 +509,13 @@ The current project does not aim to reproduce state-of-the-art counting immediat
 
 - The classic references remain useful for grounding the project, but the next-iteration planning should be informed by newer `2023-2025` work.
 - The most adequate model for this project is not necessarily the newest one; however, checking newer work is still important to confirm that the chosen next-step architecture is technically defensible.
-- For this project, the best balance of adequacy and feasibility still appears to be a shared learned pose-sequence model rather than either:
-  - continuing with handcrafted FSM logic across many exercises
-  - or jumping immediately to a heavy direct RGB counting architecture
+- For this project, the strongest current result is not one universal model but a **representation map**:
+  - dedicated pose for `squat`
+  - RGB for `push_up`
+  - mixed evidence for `pull_up`
+- That makes an exercise-dependent routed system more defensible than either:
+  - forcing one shared generic model across all exercises
+  - or jumping immediately to a heavy end-to-end direct video architecture
 
 ---
 
@@ -566,12 +530,19 @@ The current project does not aim to reproduce state-of-the-art counting immediat
 
 - The project starts from a noisy RepCount / LLSP-style dataset and performs explicit **EDA-driven cleaning, relabeling, and preparation** before modeling.
 - It validates a **pose-first architecture** for repetition counting rather than moving directly to a raw RGB video-counting model.
-- It uses a **squat-only first iteration** as a controlled validation stage for a broader multi-exercise goal.
+- It uses a **staged architecture comparison strategy**:
+  - dedicated squat pose branch
+  - shared pose TCN baseline and ablations
+  - RGB comparison branch
+  - representation-fit and hard-case audits
+  - negative multimodal fusion check
+  - practical routed counting prototype
 - It compares two different counting backends on top of the same upstream pipeline:
   - an interpretable **FSM-based counter**
   - a learned **TCN-based temporal regressor**
 - It shows that the counting backend can be replaced without changing the upstream data-preparation, pose-extraction, and feature-engineering stages.
 - It also adds failure analysis showing that the remaining learned-model errors are not strongly explained by pose-quality summary metrics alone.
+- It demonstrates that the useful representation is **exercise-dependent** under realistic video difficulty rather than universally pose-only or universally RGB-only.
 
 ### Why this matters
 
@@ -583,37 +554,54 @@ The current project does not aim to reproduce state-of-the-art counting immediat
   - engineered temporal features
   - alternative counting backends
   - saved evaluation artifacts
-- That combination is useful because it creates a practical foundation for the intended next step: a shared multi-exercise learned model for exercise recognition and repetition counting.
+- That combination is useful because it creates a practical foundation for the intended next step: an exercise-aware system that can decide whether pose, RGB, or a dedicated branch should be used for a supported exercise.
 
 ### Contribution statement
 
-> The main contribution of this project is the design and validation of a modular pose-based repetition-counting pipeline for exercise videos. Rather than introducing a new foundational counting architecture, the project contributes a reproducible end-to-end workflow that integrates dataset cleaning, YOLO-based pose extraction, engineered squat features, a rule-based baseline, and a learned temporal alternative, thereby establishing a practical foundation for future multi-exercise recognition and counting.
+> The main contribution of this project is the design and validation of a modular repetition-counting pipeline for exercise videos that moves from dataset cleaning and pose extraction through comparative architecture evaluation. Rather than introducing a new foundational counting model, the project contributes a reproducible workflow that integrates a dedicated squat pose branch, shared pose baselines, RGB comparison, hard-case audits, and an exercise-dependent routed prototype, thereby establishing a practical foundation for future exercise recognition and counting.
 
 ---
 
 ## 7. Current Metrics
 
-### Baseline / Current Known Metrics
+### Project-Level Architecture Summary
 
-- The synced local Colab 6 baseline outputs currently indicate:
-  - overall rows = `118`
-  - `MAE = 3.9745762711864407`
-  - `RMSE = 6.9581070872248105`
-  - `Within-1 = 0.559322033898305`
+The project should now be summarized as a set of completed architecture results rather than as one squat-only metric block. The strongest measured results are:
 
-### Current Tuned Metrics
+| Architecture family | Exercise | MAE | Within-1 | Interpretation |
+|---|---|---:|---:|---|
+| FSM tuned baseline | `squat` | 3.0625 | 0.5625 | Historical interpretable baseline |
+| Dedicated squat TCN | `squat` | 2.1405 | 0.5625 | Strongest single result in the project |
+| Shared pose TCN (`6B`) | `pull_up` | 4.6088 | 0.4286 | Best shared pose-only result among the compared exercises |
+| Pose transformer (`9/9B`) | `push_up` | 7.4561 | 0.0556 | Better than the shared pose TCN on `MAE`, but not competitive with the RGB winner and not improved meaningfully by augmentation |
+| RGB TCN Stage `7` | `push_up` | 6.6018 | 0.2778 | Strongest current push-up branch |
+| Stronger RGB TCN (`7B`) | `pull_up` | 4.1992 | 0.3571 | Best RGB pull-up `MAE`, but not best `Within-1` |
+| Multimodal late fusion (`7E`) | `push_up` | 6.1691 | 0.1111 | Lower `MAE`, but not the best practical branch because `Within-1` degraded |
 
-- Primary reportable split: `valid`
-  - rows = `16`
-  - `MAE = 3.0625`
-  - `RMSE = 4.9180788932265`
-  - `Within-1 = 0.5625`
-- Diagnostic split: `train`
-  - rows = `102`
-  - `MAE = 2.303921568627451`
-  - `RMSE = 4.7309991482958935`
-  - `Within-1 = 0.6764705882352942`
-- These values were recomputed from the synced local `squat_rep_count_results_tuned.csv` artifact and should be treated as the current saved-state metrics unless a newer Colab rerun overwrites them.
+### Architecture Comparison: `squat`, `pull_up`, `push_up`
+
+| Exercise | Architecture / stage | MAE | RMSE | Within-1 | Verdict |
+|---|---|---:|---:|---:|---|
+| `squat` | FSM tuned baseline | 3.0625 | 4.9181 | 0.5625 | Good interpretable baseline |
+| `squat` | Dedicated squat TCN | 2.1405 | 3.1016 | 0.5625 | Best current squat solution |
+| `squat` | Shared pose TCN (`6B`, `seq_len=256`) | 8.0430 | 11.1896 | 0.2500 | Generic pose underfits squat relative to the dedicated branch |
+| `squat` | Pose transformer (`9B`, best variant) | 9.1502 | 13.1290 | 0.1250 | Worse than the shared pose TCN; augmentation did not recover squat performance |
+| `squat` | RGB TCN Stage `7` (`ResNet18`) | 6.5446 | 8.2765 | 0.0625 | Better `MAE` than shared pose, but far below the dedicated squat branch |
+| `squat` | Stronger RGB TCN (`7B`, `ResNet50`) | 5.4245 | 6.8711 | 0.1875 | Best generic non-squat-specific alternative, still far below the dedicated pose branch |
+| `squat` | Multimodal late fusion (`7E`) | 6.6988 | 8.2765 | 0.0000 | Negative result |
+| `pull_up` | Shared pose TCN (`6B`, `seq_len=192`) | 4.6088 | 7.0169 | 0.4286 | Best `Within-1` result so far |
+| `pull_up` | Pose transformer (`9B`, aug_on) | 5.0210 | 6.5912 | 0.0714 | Slightly better `MAE` than transformer `aug_off`, but much worse `Within-1` than shared pose |
+| `pull_up` | RGB TCN Stage `7` (`ResNet18`) | 4.8686 | - | 0.1429 | RGB baseline weaker than pose |
+| `pull_up` | Stronger RGB TCN (`7B`, `ResNet50`) | 4.1992 | 5.8931 | 0.3571 | Best RGB `MAE`, but not the best practical branch on both metrics |
+| `pull_up` | Multimodal late fusion (`7E`) | 4.1193 | 5.2182 | 0.1429 | `MAE` gain, but `Within-1` collapsed too much |
+| `pull_up` | Dedicated `pull_up` pose (`10`, `channels128`) | 3.5463 | 5.5040 | 0.2857 | Best `MAE`, but still not the best practical branch on both metrics |
+| `push_up` | Shared pose TCN (`6B`, `seq_len=128`) | 8.8724 | 11.2798 | 0.0000 | Pose-only remains weak |
+| `push_up` | Pose transformer (`9B`, aug_off) | 7.4561 | 9.9192 | 0.0556 | Better than shared pose, but still behind the RGB branch |
+| `push_up` | Keypoint-weighted pose TCN (`6C`) | 8.5139 | - | 0.1111 | Small isolated pose-side improvement |
+| `push_up` | Density pose TCN (`6D`) | 8.6100 | - | 0.0000 | No meaningful recovery |
+| `push_up` | RGB TCN Stage `7` (`ResNet18`) | 6.6018 | 10.2865 | 0.2778 | Best current practical push-up branch |
+| `push_up` | Stronger RGB TCN (`7B`, `ResNet50`) | 7.3768 | - | 0.0556 | Worse than Stage `7` RGB |
+| `push_up` | Multimodal late fusion (`7E`) | 6.1691 | 9.8993 | 0.1111 | Better `MAE`, but still worse than Stage `7` RGB on `Within-1` |
 
 ### Squat-Only TCN Experiment
 
@@ -624,40 +612,54 @@ The current project does not aim to reproduce state-of-the-art counting immediat
   - metric-aware checkpointing
   - wider channel settings
   - targeted dropout and learning-rate changes
-- The best balanced final learned run from `6_TCN_Training_Colab.ipynb` is:
-  - `run_name = squat_tcn_l1_channels96_dropout01`
+- Variable-length videos were handled by temporal resampling rather than by random window crops:
+  - each full feature sequence was resampled to the fixed target length used by the TCN
+  - the model therefore received a compressed whole-video representation rather than only a short partial clip
+  - this preserves whole-video coverage for count prediction, but it also means that long videos are temporally compressed, so the resampling strategy is itself an important methodological choice
+- The strongest final learned run from `6_TCN_Training_Colab.ipynb` is:
+  - `run_name = squat_tcn_l1_channels96`
   - `channels = 96`
   - `lr = 0.001`
-  - `dropout = 0.1`
+  - `dropout = 0.2`
   - `loss = l1`
-  - `best_epoch = 48`
+  - `best_epoch = 53`
   - `valid rows = 16`
-  - `valid MAE = 2.132887`
-  - `valid RMSE = 3.099379`
-  - `valid Within-1 = 0.5000`
-- This run outperformed the earlier TCN variants in overall balance:
-  - lower `MAE` than the earlier `channels96` run
-  - similar `RMSE`
-  - stronger `Within-1` than the lower-learning-rate and larger-width alternatives
+  - `valid MAE = 2.140498`
+  - `valid RMSE = 3.101630`
+  - `valid Within-1 = 0.5625`
+- This run outperformed the other targeted TCN variants in overall balance:
+  - best `MAE` in the final targeted comparison
+  - near-identical `RMSE` to the previous best
+  - stronger `Within-1` than the lower-learning-rate, lower-dropout, and larger-width alternatives
 
 ### FSM vs TCN Comparison
 
 | Model | Split | Rows | MAE | RMSE | Within-1 |
 |---|---|---:|---:|---:|---:|
 | `FSM (tuned)` | `valid` | 16 | 3.0625 | 4.9181 | 0.5625 |
-| `TCN (best balanced)` | `valid` | 16 | 2.1329 | 3.0994 | 0.5000 |
+| `TCN (best current)` | `valid` | 16 | 2.1405 | 3.1016 | 0.5625 |
 
 ### Interpretation
 
 - The best tuned squat-only TCN improved validation `MAE` and `RMSE` relative to the tuned FSM baseline, which suggests better average count estimation.
-- The tuned FSM still retained a slightly stronger `Within-1` score, which suggests it produced more near-exact predictions even though its average error was larger.
+- In the latest run, the TCN also matched the tuned FSM on `Within-1`, which means it no longer gives up strict near-exact accuracy to achieve the lower average error.
 - Both `MAE` and `Within-1` are error-oriented quality measures, but they emphasize different behavior:
   - `MAE` measures the average size of the counting error
   - `Within-1` measures how often the prediction lands within one repetition of the true count
 - Therefore, it is possible for `MAE` to improve while `Within-1` decreases if the model reduces large mistakes overall but produces fewer near-exact predictions.
-- In practical terms, this means the learned TCN now provides clearly better average count quality while remaining reasonably close to the FSM on strict tolerance-based performance.
+- In practical terms, this means the learned TCN now provides clearly better average count quality while also matching the FSM on strict tolerance-based performance in the current validation split.
 - Additional failure analysis in `6_TCN_Training_Colab.ipynb` also showed that the remaining TCN errors are only weakly correlated with `frames_valid`, `mean_conf`, and `valid_ratio`, which suggests that the remaining misses are not strongly driven by poor pose extraction alone.
 - This comparison supports the conclusion that a learned backend is viable, but metric selection still matters because different models optimize different aspects of counting quality.
+
+### Failure Analysis Summary
+
+The reviewed hard-case layer is now complete for the selected `7D` subset: `48 / 48` hard cases were manually reviewed and summarized in `reviewed_hard_case_summary.json`. The confirmed failure taxonomy is more precise than the earlier heuristic pass. Across the reviewed cases, the largest buckets were `pose_failure = 11`, `camera_viewpoint = 8`, `rep_ambiguity = 6`, `model_failure = 6`, `target_selection = 5`, `label_mismatch = 3`, and `visibility = 3`, with `6` additional rows left as broadly difficult but not assigned a narrower primary issue. The dominant confirmed tags were `pose_jitter = 32`, `no_clear_issue = 32`, `camera_motion = 16`, `reframe = 9`, and `side_view = 9`, which makes the residual error surface much more concrete than a simple “bad videos” explanation.
+
+The exercise-specific pattern is also now clearer. For `squat`, the reviewed hard cases concentrated on `rep_ambiguity`, `pose_failure`, and a smaller number of clear `label_mismatch` rows, which supports the interpretation that squat remains pose-friendly but still sensitive to borderline rep definitions and partial clip boundaries. For `pull_up`, the dominant reviewed issues were `camera_viewpoint` and `target_selection`, which is consistent with the earlier “mixed” conclusion: the difficulty is not simply weak pose confidence, but long repetitive sequences filmed from harder viewpoints and sometimes with ambiguous target tracking. For `push_up`, the reviewed rows leaned toward `pose_failure`, `model_failure`, and a block of broadly low-quality cases, which reinforces the earlier finding that push-up is the exercise where raw RGB context carries the strongest practical value.
+
+Taken together, the completed reviewed audit shows that the remaining counting errors are driven by a mixture of viewpoint/framing difficulty, true pose-tracking failures, and rep-definition ambiguity rather than by a single uniform model weakness. This strengthens the project’s main architectural conclusion: a routed, exercise-dependent system is more defensible than a forced generic counter, because the residual failure modes differ materially by exercise and by representation.
+
+The reviewed cases and keep/flag/exclude decisions are preserved in `artifacts/3_Modeling/validation_failure_review.md` so that future reruns can separate true upstream failures from valid but harder benchmark videos.
 
 ### Results Summary
 
@@ -668,21 +670,114 @@ At the validation level, the tuned FSM achieved:
 - `RMSE = 4.9181`
 - `Within-1 = 0.5625`
 
-The best learned TCN configuration, `squat_tcn_l1_channels96_dropout01`, achieved:
-- `MAE = 2.1329`
-- `RMSE = 3.0994`
-- `Within-1 = 0.5000`
+The best learned TCN configuration, `squat_tcn_l1_channels96`, achieved:
+- `MAE = 2.1405`
+- `RMSE = 3.1016`
+- `Within-1 = 0.5625`
 
-Taken together, these results show that the learned TCN substantially improves average counting accuracy relative to the FSM baseline, while the FSM remains slightly stronger on the stricter near-exact tolerance metric. This means the project has already validated two important points:
+After applying the reviewed validation policy and excluding the confirmed unusable upstream failure (`train3898.mp4`), the filtered validation view of the same frozen TCN baseline became:
+- `rows = 15`
+- `MAE = 2.0893`
+- `RMSE = 3.1141`
+- `Within-1 = 0.6000`
+
+Taken together, these results show that the learned TCN substantially improves average counting accuracy relative to the FSM baseline while also matching the FSM on the stricter near-exact tolerance metric in the raw validation split. The policy-filtered view further suggests that at least part of the remaining error was driven by a confirmed unusable upstream case rather than by the learned counting model itself. This means the project has already validated two important points:
 - the upstream pose-based architecture is workable end to end
 - the counting backend can be replaced by a learned temporal model without changing the upstream pipeline
 
 Therefore, the present squat-only system should be reported as a validated prototype with both an interpretable baseline and a learned temporal baseline, rather than as an unfinished exploratory branch.
 
-### To Update
+### Shared Stage 6 Widened Counting Baseline
 
-- Sync `squat_rep_metrics_summary.csv` after rerunning the final Colab 6 export cell if a single-file metrics summary is still desired.
-- Keep this section synchronized with any newer saved Colab 6 reruns.
+After rebuilding the full generic pose-sequence dataset from `pose_feature_index.csv`, the first shared Stage 6 baseline trained a separate pose-sequence TCN regressor for each exercise using the same common configuration (`seq_len = 192`, `channels = 96`, `L1` loss, balanced count sampling, and light augmentation). The resulting shared baseline is weaker than the frozen squat-specific branch in absolute terms, but it still provides a meaningful reference point for the widened project. Across the nine supported exercises (`battle_rope`, `bench_pressing`, `front_raise`, `jump_jacks`, `pommelhorse`, `pull_up`, `push_up`, `sit_up`, and `squat`), the shared baseline achieved a lower macro-average `MAE` than the trivial train-split mean-count baseline (`7.97` versus `10.33`) and a higher macro-average `Within-1` score (`0.155` versus `0.064`). It beat the trivial baseline on `MAE` for seven of the nine exercises and improved `Within-1` for six of the nine.
+
+The per-exercise results were strongly heterogeneous. `pull_up`, `bench_pressing`, and `pommelhorse` showed the clearest positive signal, while `jump_jacks`, `sit_up`, and the generic shared `squat` run remained weak in absolute terms. The shared `squat` baseline still improved on the trivial squat baseline, but it remained far worse than the dedicated frozen squat branch, which indicates that a shared generic pose-sequence setup loses important exercise-specific structure. This widened Stage 6 result should therefore be treated as the official shared baseline for the multi-exercise branch, not as a final counting solution. Its main value is to identify which exercises appear learnable from pose alone and to define the next experiment path: targeted, exercise-by-exercise improvement starting with sequence-length sweeps rather than broader untargeted retuning.
+
+### RGB, Transformer, Audit, and Multimodal Results
+
+The Stage `7` branch changed the project from “pose-only tuning” to “representation comparison.” The main results were:
+
+- `squat`:
+  - RGB improved over the weak shared pose baseline in `MAE`
+  - but stayed far below the frozen dedicated squat pose branch
+  - `7C` and `7D` showed that squat remains pose-first even when pose quality is already strong
+- `pull_up`:
+  - RGB became competitive under the stronger `ResNet50` backbone
+  - but the best practical branch still depends on whether `MAE` or `Within-1` is prioritized
+- `push_up`:
+  - RGB clearly outperformed the shared pose branch
+  - `7C` showed that RGB was not only rescuing weak pose, but also contributing information beyond pose quality alone
+
+The simple late-fusion multimodal experiment (`7E`) did not justify itself. It improved `MAE` in some cases, but degraded `Within-1` enough that it did not beat the better single-modality branch consistently. This means the project should not present multimodal late fusion as a successful next architecture.
+
+The generic pose-transformer check (`9/9B`) also closed without changing the overall architecture decision. The best transformer variants:
+
+- did not beat the shared pose TCN on the practical `pull_up` tradeoff
+- remained far below the dedicated squat pose branch
+- improved `push_up` relative to the shared pose TCN, but still stayed well behind the RGB branch
+
+The augmentation ablation inside `9B` was also not a success case. It showed:
+
+- `pull_up`: slightly lower `MAE`, but `Within-1` fell from `0.2143` to `0.0714`
+- `push_up`: no meaningful change
+- `squat`: no meaningful change
+
+So `9B` should be treated as a completed negative-but-informative result rather than an open branch.
+
+### Current Practical Counting Surface
+
+The most defensible practical artifact in the repo is now the Stage `8` routed system:
+
+- `squat -> squat_tcn_l1_channels96`
+- `pull_up -> pose_count_tcn_pull_up_seq192`
+- `push_up -> rgb_count_tcn_push_up_seq128`
+
+This routed system is important because it reflects the experimental evidence directly instead of forcing one architecture family to win across all supported exercises.
+
+### Stage 11 Bootstrap Confidence Intervals
+
+Stage `11` added bootstrap confidence-interval reporting for the final reportable prediction artifacts. The completed CI outputs were:
+
+- `squat` dedicated pose control (`squat_tcn_l1_channels96`, `n = 16`)
+  - `MAE = 2.1405`, `95% CI [1.1266, 3.3313]`
+  - `RMSE = 3.1016`, `95% CI [1.6982, 4.2837]`
+  - `Within-1 = 0.5625`, `95% CI [0.3125, 0.8125]`
+
+- `pull_up` routed pose branch (`pose_count_tcn_pull_up_seq192`, `n = 14`)
+  - `MAE = 4.6088`, `95% CI [2.0863, 7.5386]`
+  - `RMSE = 7.0169`, `95% CI [3.5909, 9.7687]`
+  - `Within-1 = 0.4286`, `95% CI [0.2143, 0.7143]`
+- `push_up` routed RGB branch (`rgb_count_tcn_push_up_seq128`, `n = 18`)
+  - `MAE = 6.6018`, `95% CI [3.3063, 10.4238]`
+  - `RMSE = 10.2865`, `95% CI [5.1748, 14.8974]`
+  - `Within-1 = 0.2778`, `95% CI [0.0556, 0.5000]`
+
+These intervals reinforce the same interpretation already reached from the point estimates: the reported branches are directionally meaningful, but the small validation surfaces produce wide uncertainty ranges and therefore do not support over-precise external claims.
+
+### Methodological Concerns and Responses
+
+- **Concern: the squat validation split is very small.**  
+  **Response:** This is a real limitation of the current evaluation. The primary validation split contains only `16` videos, so the reported `MAE`, `RMSE`, and `Within-1` values are fragile and can shift noticeably when one or two unusual videos are present. This was demonstrated directly when excluding one confirmed upstream failure (`train3898.mp4`), which changed `Within-1` from `0.5625` to `0.6000`.
+
+- **Concern: the report currently gives point estimates but not uncertainty ranges.**  
+  **Response:** This criticism has now been addressed for the main reportable branches. A reusable bootstrap utility was added and Stage `11` produced confidence intervals for the dedicated `squat` control plus the routed `pull_up` and `push_up` branches. Those intervals are wide, which supports the document's caution that these evaluation slices are useful for scoped conclusions but not for narrow external claims.
+
+- **Concern: would cross-validation over train plus valid be more reliable?**  
+  **Response:** Yes, cross-validation over the current `train + valid` pool, while keeping `test` fully held out, would likely produce more stable project-level estimates than a single `16`-video validation split. However, that would become a project-specific evaluation protocol rather than a direct reproduction of the current fixed-split benchmark setup.
+
+- **Concern: the TCN sequence length may create a temporal mismatch with whole-video count targets.**  
+  **Response:** This should be documented explicitly. The TCN uses `seq_len = 192`, while the source squat videos are often much longer. In the current trainer, variable-length videos are not randomly cropped to `192` frames; instead, the full sequence is temporally resampled to a fixed length before training and evaluation. That design preserves whole-video coverage, but it also compresses longer temporal structure, so the resampling choice has real implications for count prediction and should be treated as a methodological decision rather than an implementation detail.
+
+- **Concern: `Within-1 = 0.5625` needs stronger contextual interpretation.**  
+  **Response:** This is correct. A raw `Within-1` value of `0.5625` means the model lands within one repetition of the true count in only about `56%` of the raw validation videos, which would likely be insufficient for a finished fitness product. At the same time, this number should not be over-interpreted as a direct benchmark comparison because published RepCount papers typically report dataset-level Part-A or RepCount-pose results, not the same `16`-video squat-only validation slice used here. In the RepCount literature, `OBO` is effectively the same idea as `Within-1`, so a separate `OBO` value is not an additional metric in this setting. Because the dataset also contains broad count variability and outliers, `Within-1` is best treated as a supplementary strict-tolerance metric, while `MAE` and `RMSE` remain important for understanding the magnitude of residual counting error.
+
+- **Concern: class imbalance and count outliers may be distorting the squat-only evaluation.**  
+  **Response:** This needs to be interpreted carefully. The large class-imbalance ratio discussed in EDA is mainly a multi-exercise concern and does not directly affect the current squat-only evaluation, because the current model is not classifying across exercises. The count-outlier observation is more relevant, but the earlier flagged outliers were identified at the broader dataset level rather than in the current squat validation slice. In the frozen `16`-video squat validation set, the highest counts are `44` and `39`, so the current valid split does not contain the most extreme count outliers described in EDA. However, these relatively high-count squat videos can still increase `MAE` and `RMSE` sensitivity, because the same relative counting mistake produces a larger absolute error when the true repetition count is high.
+
+### Reporting Improvement Still Open
+
+- If stronger external rigor is needed later, extend the same CI reporting to any additional final branches or aggregate routed summaries beyond the current reportable control/routed set.
+- If the reviewed hard-case taxonomy is to be quoted externally as a final quantitative result, it is still worth normalizing the small `unspecified` bucket into narrower issue labels for maximum consistency.
 
 ---
 
@@ -690,10 +785,12 @@ Therefore, the present squat-only system should be reported as a validated proto
 
 ### Immediate Next Steps
 
-- Freeze `squat_tcn_l1_channels96_dropout01` as the current best learned squat baseline
-- Save and verify all result CSV artifacts
-- Inspect the hardest `valid` examples from `predictions.csv`
-- Record manual failure notes for the worst validation videos, especially cases where pose quality is strong but the count is still wrong
+- Keep Stage `9B` closed as a completed negative result; do not reopen the generic pose-transformer branch unless a new representation question justifies it.
+- Keep the frozen squat branch as the control baseline for any future squat comparison.
+- Keep the routed Stage `8` system as the practical surface while the remaining research questions are resolved.
+- Use the completed reviewed hard-case summary from `7D` when discussing remaining failures, instead of relying only on heuristic buckets or anecdotal examples.
+- Only after that, decide whether a dedicated `push_up` pose branch is worth building as a falsification test against the current RGB winner.
+- Keep Countix deferred until a later external-validation question justifies the added scope.
 
 ### Error Analysis Checklist
 
@@ -711,42 +808,63 @@ To interpret the current TCN results correctly, the next evaluation pass should 
 
 ### Mid-Term Next Steps
 
-- Stop broad squat-only tuning unless failure analysis reveals one clear fix
-- Keep the squat branch as the validated prototype and baseline for comparison
-- Prepare the transition to a shared multi-exercise learned model while keeping YOLO Pose as the front end
+- Stop broad untargeted tuning on the already-completed negative branches (`6C`, `6D`, `7E`) unless a new failure pattern justifies revisiting them.
+- Keep the squat branch as the validated prototype and baseline for comparison.
+- Improve the supported exercises one by one rather than forcing a generic winner too early.
+- Finish the `pull_up` decision first, then decide whether `push_up` deserves one dedicated pose-side falsification run.
+- Keep the representation choice explicit in the documentation:
+  - pose-first for `squat`
+  - RGB-first for `push_up`
+  - unresolved / comparison-sensitive for `pull_up`
+
+### Evaluation Plan For The Widened Stage
+
+- Keep the original dataset split semantics:
+  - `train` for fitting the widened model
+  - `valid` for model selection, failure analysis, and iterative comparison
+  - `test` held out during development
+- Use the widened `train + valid` data only for internal development until the multi-exercise counting pipeline is stable enough to justify a final held-out test evaluation.
+- If cross-validation is later introduced for more stable internal estimates, treat that as a project-specific secondary analysis and keep the official `test` split untouched until the final reporting stage.
+- Report widened results at two levels once Stage 6 exists:
+  - aggregate multi-exercise metrics across the included classes
+  - per-exercise metrics where the sample size is large enough to be interpretable
+- Reuse the same discipline established in the squat branch:
+  - keep raw evaluation outputs
+  - document any manual keep/flag/exclude policy separately from the raw benchmark view
 
 ### Long-Term Next Steps
 
-- Generalize to a multi-exercise system
-- Build a shared pose-sequence data contract with labels for both exercise class and repetition count
-- Start with a multi-exercise TCN baseline before moving to heavier pose-native models such as `ST-GCN`
-- Reduce notebook dependency
-- Move toward broader deployment settings
+- Generalize from the routed prototype toward an exercise-aware system that can first identify the exercise and then call the right counting branch.
+- Build an explicit exercise-recognition stage on top of the existing pose or RGB front ends.
+- Revisit stronger pose-native models such as `ST-GCN`, `BlockGCN`, or `SkeleTR` only after the current exercise-dependent baseline is frozen.
+- Revisit stronger video-native RGB models only if the project intentionally shifts away from the current frozen-feature RGB branch.
+- Reduce notebook dependency and centralize experiment execution and registration.
+- Move toward broader deployment settings only after the exercise-dependent branch map is stable.
 
 ### Proposed Next Architecture
 
-The next architecture should move beyond squat-only counting and explicitly separate three decisions that are currently entangled in the video: identifying the target person, identifying the exercise or movement being performed, and estimating the repetition count. The recommended direction is therefore a two-stage design in which the system first selects the relevant exercising person and recognizes the exercise, and only then applies a repetition-counting model to that chosen target.
+The current practical architecture is already exercise-dependent at the counting stage. The next architecture should therefore not undo that evidence by forcing a single shared counter too early. Instead, it should explicitly separate three decisions that are currently entangled in the video: identifying the target person, identifying the exercise or movement being performed, and selecting or applying the right repetition-counting branch. The recommended long-term direction is therefore a two-stage design in which the system first selects the relevant exercising person and recognizes the exercise, and only then applies the appropriate counting model to that chosen target.
 
 In practical terms, the intended next architecture is:
 
-`video -> target person selection / tracking -> exercise recognition -> repetition counting`
+`video -> target person selection / tracking -> exercise recognition -> branch selection -> repetition counting`
 
-The pose-based version of this architecture would keep the validated YOLO frontend, use a temporal classifier to identify the exercise from the selected person's pose sequence, and then apply a counting model to the same selected target. This design is better aligned with the real project goal than applying counting directly to the whole scene, especially in videos that contain multiple people, unrelated motion, occlusion, or obstacles.
+The pose-based version of this architecture would keep the validated YOLO frontend, use a temporal classifier to identify the exercise from the selected person's pose sequence, and then either route to the strongest saved branch or apply a future exercise-specific counter to the same selected target. This design is better aligned with the real project goal than applying one generic counting model directly to the whole scene, especially in videos that contain multiple people, unrelated motion, occlusion, or obstacles.
 
 This also establishes a clear design principle for future work: counting should be applied only after the system has identified the correct subject and the correct exercise context. In other words, the next-stage system is expected to be a detect-first-then-count pipeline rather than a single counting model applied to the full video without subject or activity disambiguation.
 
 ### Candidate Models For The Next Iteration
 
-The next iteration is expected to move away from handcrafted exercise-specific rules and toward a shared learned model that can support multiple exercises at once. If YOLO Pose is retained as the front end, the main design question becomes which temporal model should map pose sequences to:
+The next modeling iteration is no longer best framed as “find one generic counter.” Instead, the open design question is which temporal models should be used for:
 
 - exercise classification
-- repetition-count prediction
+- branch strengthening where the current routed system is still weak or unresolved
 
-The target architecture would be:
+If YOLO Pose is retained as the front end, the shared recognition target architecture would be:
 
-`video -> YOLO pose -> pose sequence -> shared temporal model -> {exercise class, rep count}`
+`video -> YOLO pose -> pose sequence -> shared temporal model -> exercise class`
 
-The candidate models listed below are restricted to approaches that are well aligned with a **YOLO-pose-first pipeline**. Architectures such as `CNN + LSTM` were intentionally not prioritized here because they are more naturally suited to raw RGB frame sequences than to already-extracted pose/keypoint sequences.
+The candidate models listed below are therefore restricted to approaches that are well aligned with a **YOLO-pose-first pipeline** and are most relevant either for future exercise recognition or for stronger pose-native branch development. Architectures such as `CNN + LSTM` were intentionally not prioritized here because they are more naturally suited to raw RGB frame sequences than to already-extracted pose/keypoint sequences.
 
 #### Candidate Model Summary
 
@@ -849,7 +967,7 @@ The candidate models listed below are restricted to approaches that are well ali
 - Not the best first replacement for the current FSM pipeline
 
 **Fit for this project**
-- Better as a later research experiment than as the immediate next iteration
+- Better as a controlled follow-up after the pose TCN and RGB branches, using the same Stage 5 pose-sequence contract and augmentation path
 
 ### Count-Head Design Options
 
@@ -877,14 +995,16 @@ Regardless of the temporal backbone, the repetition-count output can be modeled 
 
 ### Current Recommendation
 
-- Keep the current squat FSM pipeline as the baseline prototype.
-- For the next iteration, retain YOLO Pose and replace handcrafted exercise logic with a shared multi-exercise temporal model.
-- Recommended order of exploration:
-  - `TCN / 1D CNN` as the fastest practical next model
-  - `ST-GCN / 2s-AGCN` as the strongest pose-native long-term direction
-  - `direct regression` as the first count-output design
+- Keep the current dedicated squat TCN as the squat control baseline.
+- Keep the shared pose TCN as the generic pose reference, not as the final universal model.
+- Use the Stage `8` routed system as the presentable practical counting surface.
+- Recommended order of exploration now:
+  - freeze the dedicated `pull_up` result as informative but mixed
+  - freeze the transformer augmentation evidence from `9B` as a negative result
+  - only then decide whether a dedicated `push_up` pose branch is worth building
+  - defer heavier skeleton models and video-native RGB models until the exercise-dependent baseline is frozen
 
-This recommendation supports the broader project goal of moving from a squat-only validation prototype toward a shared multi-exercise repetition-counting system without relying on handcrafted per-exercise rules.
+This recommendation supports the broader project goal of moving from architecture exploration toward a stable exercise-dependent counting system that can later be expanded with exercise recognition.
 
 ---
 
@@ -894,11 +1014,27 @@ This recommendation supports the broader project goal of moving from a squat-onl
 
 - `README.md`
 - `artifacts/specification.md`
+- `artifacts/2_Data_preparation/COUNTIX_INTEGRATION.md`
+- `artifacts/2_Data_preparation/prepare_countix_manifest.py`
 - `artifacts/3_Modeling/YOLO_PIPELINE.md`
 - `artifacts/3_Modeling/YOLO_POSE_STAGE.md`
-- `artifacts/3_Modeling/4_Squat_Pose_Extraction_Colab.ipynb`
-- `artifacts/3_Modeling/5_Squat_Feature_Extraction_Colab.ipynb`
+- `artifacts/3_Modeling/validation_failure_review.md`
+- `artifacts/3_Modeling/EXPERIMENT_SHOWCASE.md`
+- `artifacts/3_Modeling/ARCHITECTURE_RESULTS_MATRIX.md`
+- `artifacts/3_Modeling/experiment_registry.csv`
+- `artifacts/3_Modeling/4_All_Exercises_Pose_Extraction_Colab.ipynb`
+- `artifacts/3_Modeling/5_All_Exercises_Pose_Sequence_Preparation_Colab.ipynb`
+- `artifacts/3_Modeling/6_All_Exercises_Counting_Baseline_Colab.ipynb`
 - `artifacts/3_Modeling/6_Squat_Rep_Counting_Colab.ipynb`
+- `artifacts/3_Modeling/7_RGB_Counting_Baseline_Colab.ipynb`
+- `artifacts/3_Modeling/7B_Stronger_RGB_Backbone_Colab.ipynb`
+- `artifacts/3_Modeling/7C_Representation_Fit_Analysis_Colab.ipynb`
+- `artifacts/3_Modeling/7D_Hard_Case_Data_Audit_Colab.ipynb`
+- `artifacts/3_Modeling/7E_Multimodal_Pose_RGB_Fusion_Colab.ipynb`
+- `artifacts/3_Modeling/8_Exercise_Dependent_Counting_Colab.ipynb`
+- `artifacts/3_Modeling/9_Pose_Transformer_Colab.ipynb`
+- `artifacts/3_Modeling/9B_Pose_Transformer_Augmentation_Ablation_Colab.ipynb`
+- `artifacts/3_Modeling/10_PullUp_Dedicated_Pose_Colab.ipynb`
 
 ### External References To Keep
 
@@ -930,8 +1066,20 @@ Use this section to keep a quick running history of changes.
 - `2026-03-13`: Working draft created.
 - `2026-03-13`: Updated with findings and actions from `1_EDA_34.ipynb`, including typo cleaning, `others` inspection, relabeling to `rowing_erg`, removals, split verification, imbalance, and outlier observations.
 - `2026-03-13`: Updated with deterministic cleaning and export details from `2_Data_Preparation_01.ipynb`, including typo normalization policy, relabel/remove maps, split-leakage checks, and cleaned artifact exports.
-- `2026-03-13`: Updated Stage 4 and Stage 5 from `4_Squat_Pose_Extraction_Colab.ipynb`, including the Drive-backed squat index, Colab 4 smoke test, GPU-based YOLO inference, and the successful `118/118` squat pose-extraction result.
+- `2026-03-13`: Updated Stage 4 and Stage 5 from the original `4_Squat_Pose_Extraction_Colab.ipynb` workflow, including the Drive-backed squat index, Colab 4 smoke test, GPU-based YOLO inference, and the successful `118/118` squat pose-extraction result.
 - `2026-03-13`: Updated Stage 6 from `5_Squat_Feature_Extraction_Colab.ipynb`, including the Drive-based feature pipeline, saved squat feature artifacts, and the successful `118/118` engineered-feature run with high lower-body confidence.
 - `2026-03-13`: Updated Stage 7, Stage 8, and the metrics section from `6_Squat_Rep_Counting_Colab.ipynb` and synced Colab 6 CSV outputs, including baseline results, tuning artifacts, and the current saved tuned train/valid metrics.
 - `2026-03-13`: Added the squat-only TCN training branch, including the Colab notebook, trainer script, TCN metrics, and an FSM-versus-TCN comparison in the draft.
-- `2026-03-13`: Updated the draft with the final `6_TCN_Training_Colab.ipynb` tuning results, promoted `squat_tcn_l1_channels96_dropout01` as the current best learned squat baseline, and added the failure-analysis conclusion that remaining TCN errors are only weakly correlated with pose-quality summary metrics.
+- `2026-03-13`: Updated the draft with the then-current `6_TCN_Training_Colab.ipynb` tuning results, promoted `squat_tcn_l1_channels96_dropout01` as the best learned squat baseline at that time, and added the failure-analysis conclusion that remaining TCN errors are only weakly correlated with pose-quality summary metrics.
+- `2026-03-23`: Updated the draft after the latest Colab 6 rerun, promoted `squat_tcn_l1_channels96` as the strongest learned squat baseline (`MAE = 2.1405`, `RMSE = 3.1016`, `Within-1 = 0.5625`), and added the manual failure-analysis summary for the hardest validation videos.
+- `2026-03-26`: Added the Stage 9 pose-transformer experiment scaffolding, reusing the Stage 6 augmentation path and the same artifact contract as the pose TCN runs for direct comparison.
+- `2026-03-26`: Added `register_experiment.py` so new stages can append or update `experiment_registry.csv` without editing the registry manually.
+- `2026-03-26`: Added the Stage 9B augmentation-ablation notebook so the transformer branch can be evaluated with the current pose augmentation on versus off under otherwise matched conditions.
+- `2026-03-27`: Updated the draft around the completed architecture study, including the RGB, stronger RGB, audit, multimodal, and routed-counting results, and rewrote the metrics and next-steps sections around the current exercise-dependent conclusion.
+- `2026-03-27`: Added the new project references and updated Stage `10` as the dedicated `pull_up` pose follow-up, with the result that `pull_up` remains mixed rather than producing a clear new pose-specialized winner.
+- `2026-03-27`: Finalized the Stage `9B` augmentation-ablation result: the generic pose-transformer branch did not produce a robust validation gain, and augmentation did not improve the branch consistently enough to change the project conclusion.
+- `2026-03-27`: Added `bootstrap_count_confidence_intervals.py` plus a lightweight regression test so small validation splits can be reported with bootstrap confidence intervals instead of point estimates alone.
+- `2026-03-27`: Added Stage `11` as a Colab surface for running bootstrap confidence intervals on the final reportable prediction artifacts in Drive.
+- `2026-03-27`: Added the completed Stage `11` CI results to the draft for the dedicated `squat` control and the routed `pull_up` and `push_up` branches.
+- `2026-03-27`: Added `build_hard_case_review_manifest.py` and `summarize_reviewed_hard_cases.py` so the heuristic `7D` audit can be converted into a reviewed hard-case annotation layer.
+- `2026-03-27`: Added Countix onboarding scaffolding as a separate benchmark branch under `Data/Countix`, then deferred it from the active experiment flow so the current LLSP conclusions remain the main project surface.

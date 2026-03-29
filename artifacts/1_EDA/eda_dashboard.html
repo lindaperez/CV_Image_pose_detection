@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LLSP EDA Dashboard</title>
+  <style>
+    :root {
+      --bg: #f6f1e8;
+      --panel: #fffdf8;
+      --ink: #1f1d1a;
+      --muted: #6c655b;
+      --line: #ddd2c4;
+      --accent: #b84c2a;
+      --shadow: 0 10px 30px rgba(32, 26, 18, 0.08);
+      --radius: 18px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(184, 76, 42, 0.12), transparent 28%),
+        linear-gradient(180deg, #fbf8f3 0%, var(--bg) 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .shell {
+      max-width: 1440px;
+      margin: 0 auto;
+      display: grid;
+      gap: 18px;
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 18px 20px;
+    }
+    .hero {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      align-items: start;
+    }
+    h1, h2, h3 { margin: 0; line-height: 1.2; }
+    h1 { font-size: 1.8rem; margin-bottom: 8px; }
+    h2 { font-size: 1.05rem; margin-bottom: 12px; }
+    p { margin: 0; color: var(--muted); line-height: 1.5; }
+    .button {
+      border: 0;
+      border-radius: 999px;
+      padding: 10px 14px;
+      background: var(--ink);
+      color: #fff;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font: inherit;
+    }
+    .button.secondary { background: #e7ddd1; color: var(--ink); }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .stat {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #fff;
+      padding: 12px;
+    }
+    .stat strong {
+      display: block;
+      font-size: 1.35rem;
+      color: var(--accent);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+    }
+    .cards {
+      display: grid;
+      gap: 12px;
+    }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: #fff;
+      padding: 14px;
+      display: grid;
+      gap: 10px;
+    }
+    .card img {
+      width: 100%;
+      border-radius: 12px;
+      border: 1px solid #efe4d6;
+      background: #faf7f2;
+    }
+    .link-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .link-list a {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 8px 12px;
+      text-decoration: none;
+      color: var(--ink);
+      background: #fff;
+      font-size: 0.9rem;
+    }
+    .muted { color: var(--muted); }
+    @media (max-width: 980px) {
+      .stats, .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <section class="panel hero">
+      <div>
+        <h1>LLSP EDA Dashboard</h1>
+        <p>Quick access to the main exploratory-analysis assets used before cleaning, feature extraction, and modeling.</p>
+      </div>
+      <div class="link-list">
+        <a class="button secondary" href="../../index.html" target="_blank" rel="noopener noreferrer">Open home</a>
+        <a class="button secondary" href="../3_Modeling/architecture_results_dashboard.html" target="_blank" rel="noopener noreferrer">Open results hub</a>
+        <a class="button" href="./1_EDA_34.ipynb" target="_blank" rel="noopener noreferrer">Open EDA notebook</a>
+        <a class="button secondary" href="../3_Modeling/hard_case_review_app.html" target="_blank" rel="noopener noreferrer">Back to 7D review</a>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="stats">
+        <div class="stat">
+          <strong>1</strong>
+          <span>Primary EDA notebook</span>
+        </div>
+        <div class="stat">
+          <strong>6+</strong>
+          <span>Core summary plots</span>
+        </div>
+        <div class="stat">
+          <strong>10+</strong>
+          <span>Exercise inspection PDFs</span>
+        </div>
+        <div class="stat">
+          <strong>LLSP</strong>
+          <span>Dataset basis for the main pipeline</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid">
+      <div class="panel">
+        <h2>Core EDA plots</h2>
+        <div class="cards">
+          <article class="card">
+            <h3>Class imbalance: train vs valid</h3>
+            <p>High-level view of exercise distribution used to motivate balanced sampling and scoped exercise selection.</p>
+            <img src="./class_imbalance_train_valid.png" alt="Class imbalance train valid plot">
+            <div class="link-list">
+              <a href="./class_imbalance_train_valid.png" target="_blank" rel="noopener noreferrer">Open image</a>
+            </div>
+          </article>
+          <article class="card">
+            <h3>Count distribution</h3>
+            <p>Shows the long-tailed repetition-count problem that remains even when exercise counts are fairly balanced.</p>
+            <img src="./count_distribution.png" alt="Count distribution plot">
+            <div class="link-list">
+              <a href="./count_distribution.png" target="_blank" rel="noopener noreferrer">Open image</a>
+            </div>
+          </article>
+          <article class="card">
+            <h3>Cycle duration</h3>
+            <p>Used to reason about temporal resampling risk and per-exercise differences in repetition tempo.</p>
+            <img src="./cycle_duration.png" alt="Cycle duration plot">
+            <div class="link-list">
+              <a href="./cycle_duration.png" target="_blank" rel="noopener noreferrer">Open image</a>
+            </div>
+          </article>
+          <article class="card">
+            <h3>Temporal annotation overview</h3>
+            <p>Illustrates how the original LLSP annotations encode repetition intervals through the `L*` columns.</p>
+            <img src="./temporal_annotation.png" alt="Temporal annotation plot">
+            <div class="link-list">
+              <a href="./temporal_annotation.png" target="_blank" rel="noopener noreferrer">Open image</a>
+            </div>
+          </article>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Inspection PDFs and follow-up visuals</h2>
+        <div class="cards">
+          <article class="card">
+            <h3>Per-exercise inspection PDFs</h3>
+            <p>Manual inspection packs generated during EDA for selected exercises and cleanup review.</p>
+            <div class="link-list">
+              <a href="./squat_inspection.pdf" target="_blank" rel="noopener noreferrer">Squat PDF</a>
+              <a href="./push_up_inspection.pdf" target="_blank" rel="noopener noreferrer">Push-up PDF</a>
+              <a href="./pull_up_inspection.pdf" target="_blank" rel="noopener noreferrer">Pull-up PDF</a>
+              <a href="./sit_up_inspection.pdf" target="_blank" rel="noopener noreferrer">Sit-up PDF</a>
+              <a href="./jump_jacks_inspection.pdf" target="_blank" rel="noopener noreferrer">Jump jacks PDF</a>
+              <a href="./bench_pressing_inspection.pdf" target="_blank" rel="noopener noreferrer">Bench pressing PDF</a>
+            </div>
+          </article>
+          <article class="card">
+            <h3>Split and annotation diagnostics</h3>
+            <p>Additional supporting plots used to verify data partitions, annotation structure, and exercise-level outliers.</p>
+            <div class="link-list">
+              <a href="./split_verification.png" target="_blank" rel="noopener noreferrer">Split verification</a>
+              <a href="./stratification_heatmap.png" target="_blank" rel="noopener noreferrer">Stratification heatmap</a>
+              <a href="./violin_per_class.png" target="_blank" rel="noopener noreferrer">Violin per class</a>
+              <a href="./nan_sparsity.png" target="_blank" rel="noopener noreferrer">NaN sparsity</a>
+            </div>
+          </article>
+          <article class="card">
+            <h3>How this is used</h3>
+            <p class="muted">Use this page as the EDA landing surface when reviewing dataset assumptions, class imbalance, label structure, and the evidence behind later modeling decisions.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+  </div>
+</body>
+</html>

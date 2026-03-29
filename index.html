@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LLSP Project Home</title>
+  <style>
+    :root {
+      --bg: #f6f1e8;
+      --panel: #fffdf8;
+      --ink: #1f1d1a;
+      --muted: #6c655b;
+      --line: #ddd2c4;
+      --accent: #b84c2a;
+      --accent-soft: #f7ddd2;
+      --shadow: 0 10px 30px rgba(32, 26, 18, 0.08);
+      --radius: 18px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(184, 76, 42, 0.12), transparent 28%),
+        linear-gradient(180deg, #fbf8f3 0%, var(--bg) 100%);
+      min-height: 100vh;
+      padding: 24px;
+    }
+
+    .shell {
+      max-width: 1440px;
+      margin: 0 auto;
+      display: grid;
+      gap: 18px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 22px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1.25fr 0.95fr;
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    h1, h2, h3 {
+      margin: 0;
+      line-height: 1.2;
+    }
+
+    h1 {
+      font-size: clamp(2rem, 4vw, 3.1rem);
+      margin-bottom: 10px;
+    }
+
+    h2 {
+      font-size: 1.1rem;
+      margin-bottom: 12px;
+    }
+
+    h3 {
+      font-size: 1rem;
+      margin-bottom: 8px;
+    }
+
+    p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .hero-copy {
+      display: grid;
+      gap: 16px;
+    }
+
+    .hero-kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      width: fit-content;
+      border: 1px solid rgba(184, 76, 42, 0.18);
+      background: var(--accent-soft);
+      color: var(--accent);
+      border-radius: 999px;
+      padding: 7px 12px;
+      font-size: 0.88rem;
+    }
+
+    .button-row,
+    .link-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .button,
+    .link-list a {
+      border: 0;
+      border-radius: 999px;
+      padding: 10px 14px;
+      background: var(--ink);
+      color: #fff;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font: inherit;
+    }
+
+    .button.secondary,
+    .link-list a.secondary {
+      background: #e7ddd1;
+      color: var(--ink);
+    }
+
+    .summary-grid,
+    .stats,
+    .route-grid,
+    .nav-grid {
+      display: grid;
+      gap: 14px;
+    }
+
+    .stats {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .stat {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 14px;
+      background: #fff;
+    }
+
+    .stat strong {
+      display: block;
+      color: var(--accent);
+      font-size: 1.6rem;
+      margin-bottom: 6px;
+    }
+
+    .nav-grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .nav-card,
+    .route-card,
+    .note-card {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 16px;
+      background: #fff;
+      display: grid;
+      gap: 10px;
+    }
+
+    .nav-card strong,
+    .route-card strong {
+      font-size: 1.05rem;
+    }
+
+    .nav-card a:last-child {
+      width: fit-content;
+      margin-top: auto;
+    }
+
+    .route-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .route-card .metric {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      font-size: 0.92rem;
+      color: var(--muted);
+    }
+
+    .strip {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .stage {
+      border: 1px dashed #d8c8b6;
+      border-radius: 16px;
+      padding: 14px;
+      background: rgba(255, 255, 255, 0.72);
+      display: grid;
+      gap: 6px;
+    }
+
+    .stage small,
+    .note-card small {
+      color: var(--muted);
+    }
+
+    .foot {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    @media (max-width: 1080px) {
+      .hero,
+      .nav-grid,
+      .stats,
+      .route-grid,
+      .strip {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <section class="panel hero">
+      <div class="hero-copy">
+        <span class="hero-kicker">LLSP exercise counting project</span>
+        <div>
+          <h1>Home</h1>
+          <p>This is the browser landing page for the project. Use it to move between the EDA assets, architecture results, hard-case review workflow, and the main documentation without hunting through folders.</p>
+        </div>
+        <div class="button-row">
+          <a class="button" href="./artifacts/3_Modeling/architecture_results_dashboard.html">Open architecture results</a>
+          <a class="button secondary" href="./artifacts/1_EDA/eda_dashboard.html">Open EDA dashboard</a>
+          <a class="button secondary" href="./artifacts/3_Modeling/squat_runtime_dashboard.html">Open squat prototype</a>
+          <a class="button secondary" href="./artifacts/3_Modeling/hard_case_review_app.html">Open 7D review tool</a>
+        </div>
+      </div>
+
+      <div class="summary-grid">
+        <div class="note-card">
+          <strong>Current practical conclusion</strong>
+          <p>The project does not end with one generic winner. It ends with an evidence-based route map: <code>squat</code> stays dedicated pose, <code>push_up</code> stays RGB-first, and <code>pull_up</code> remains mixed.</p>
+        </div>
+        <div class="note-card">
+          <strong>What this home page is for</strong>
+          <p>Fast project navigation, clearer storytelling, and a cleaner starting point for review. From here you can inspect the experiment history, audit difficult cases, and open the final documentation.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="stats">
+        <div class="stat">
+          <strong>11</strong>
+          <span>Major staged notebooks in the main LLSP arc</span>
+        </div>
+        <div class="stat">
+          <strong>3</strong>
+          <span>Supported routed exercises in the practical output</span>
+        </div>
+        <div class="stat">
+          <strong>48</strong>
+          <span>Hard cases selected for structured review from 7D</span>
+        </div>
+        <div class="stat">
+          <strong>27</strong>
+          <span>Current script-level tests in the repo</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Project Surfaces</h2>
+      <div class="nav-grid">
+        <article class="nav-card">
+          <strong>Architecture Results</strong>
+          <p>Filter the architecture matrix by exercise, family, and verdict. This is the main browser surface for the project results.</p>
+          <a class="button" href="./artifacts/3_Modeling/architecture_results_dashboard.html">Open results hub</a>
+        </article>
+        <article class="nav-card">
+          <strong>EDA Dashboard</strong>
+          <p>Plots, inspection PDFs, and the early evidence behind the class imbalance and annotation-shape decisions.</p>
+          <a class="button secondary" href="./artifacts/1_EDA/eda_dashboard.html">Open EDA</a>
+        </article>
+        <article class="nav-card">
+          <strong>7D Hard-Case Review</strong>
+          <p>Video review, original LLSP intervals, pose overlay, issue tagging, and manifest save flow for the reviewed error layer.</p>
+          <a class="button secondary" href="./artifacts/3_Modeling/hard_case_review_app.html">Open review app</a>
+        </article>
+        <article class="nav-card">
+          <strong>Squat Runtime</strong>
+          <p>Smallest runnable counting surface in the repo: squat-only, offline, and now pointed at the dedicated squat TCN with FSM kept as fallback.</p>
+          <a class="button secondary" href="./artifacts/3_Modeling/squat_runtime_dashboard.html">Open squat prototype</a>
+        </article>
+        <article class="nav-card">
+          <strong>Live Squat Webcam</strong>
+          <p>Interactive squat-only prototype: webcam input, YOLO pose, tracked target selection, live TCN inference, and on-screen count display.</p>
+          <a class="button secondary" href="./artifacts/3_Modeling/live_squat_runtime_dashboard.html">Open live prototype</a>
+        </article>
+        <article class="nav-card">
+          <strong>Docs and Artifacts</strong>
+          <p>README, experiment showcase, architecture matrix, and implementation draft in one place.</p>
+          <div class="link-list">
+            <a class="secondary" href="./README.md">README</a>
+            <a class="secondary" href="./artifacts/3_Modeling/EXPERIMENT_SHOWCASE.md">Showcase</a>
+            <a class="secondary" href="./artifacts/3_Modeling/ARCHITECTURE_RESULTS_MATRIX.md">Matrix</a>
+            <a class="secondary" href="./artifacts/implementation_document_draft.md">Draft</a>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Current Route Map</h2>
+      <div class="route-grid">
+        <article class="route-card">
+          <strong>Squat</strong>
+          <p>Dedicated pose is still the correct control and the strongest measured solution.</p>
+          <div class="metric">
+            <span>Run: <code>squat_tcn_l1_channels96</code></span>
+            <span>MAE: <strong>2.14</strong></span>
+            <span>Within-1: <strong>0.5625</strong></span>
+            <span>CI added in Stage 11</span>
+          </div>
+        </article>
+        <article class="route-card">
+          <strong>Pull-up</strong>
+          <p>Still mixed. Shared pose keeps the best practical <code>Within-1</code> tradeoff even after dedicated follow-up tuning.</p>
+          <div class="metric">
+            <span>Run: <code>pose_count_tcn_pull_up_seq192</code></span>
+            <span>MAE: <strong>4.61</strong></span>
+            <span>Within-1: <strong>0.4286</strong></span>
+            <span>Dedicated pose improved MAE only</span>
+          </div>
+        </article>
+        <article class="route-card">
+          <strong>Push-up</strong>
+          <p>RGB remains the strongest practical branch. Pose-only and transformer variants did not change that conclusion.</p>
+          <div class="metric">
+            <span>Run: <code>rgb_count_tcn_push_up_seq128</code></span>
+            <span>MAE: <strong>6.60</strong></span>
+            <span>Within-1: <strong>0.2778</strong></span>
+            <span>Routed branch for Stage 8</span>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Stage Flow</h2>
+      <div class="strip">
+        <div class="stage">
+          <strong>1. Understand the data</strong>
+          <small>EDA plots, class balance, temporal annotations, inspection PDFs.</small>
+        </div>
+        <div class="stage">
+          <strong>2. Prepare and extract</strong>
+          <small>Clean labels, build indexes, extract pose and RGB features.</small>
+        </div>
+        <div class="stage">
+          <strong>3. Compare architectures</strong>
+          <small>Shared pose, dedicated pose, RGB, transformer, multimodal, routed.</small>
+        </div>
+        <div class="stage">
+          <strong>4. Review failures</strong>
+          <small>Audit hard cases, inspect video intervals, confirm real challenges.</small>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel foot">
+      <p>Use this page as the project root when serving the repo locally with the review server or a static server.</p>
+      <div class="link-list">
+        <a class="secondary" href="./artifacts/3_Modeling/experiment_registry.csv">Experiment registry</a>
+        <a class="secondary" href="./artifacts/3_Modeling/architecture_results_long.csv">Architecture CSV</a>
+      </div>
+    </section>
+  </div>
+</body>
+</html>

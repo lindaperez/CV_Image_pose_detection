@@ -1,9 +1,15 @@
 #!/usr/bin/env python3
 """
-Build a pose feature index CSV from cleaned LLSP annotations.
+Build a pose feature index CSV for raw or cleaned LLSP / RepCount annotations.
 
-This is useful when you want to extract pose features for only one exercise,
-for example a squat-only end-to-end slice of the pipeline.
+This script supports both:
+- cleaned annotation CSVs with an explicit ``split`` column
+- original RepCount split files under ``Data/LLSP/annotation`` where the split
+  must be inferred from the filename
+
+It can be used for:
+- a squat-only slice of the pipeline
+- a full multi-exercise pose-extraction pass
 """
 
 from __future__ import annotations
@@ -16,7 +22,26 @@ from typing import Dict, Iterable, List
 
 PROJECT_DIR = Path(__file__).resolve().parents[2]
 ANNOTATION_CLEANED_DIR = PROJECT_DIR / "Data" / "LLSP" / "annotation_cleaned"
+ANNOTATION_DIR = PROJECT_DIR / "Data" / "LLSP" / "annotation"
 FEATURE_DIR_DEFAULT = ANNOTATION_CLEANED_DIR / "pose_features"
+
+CANONICAL_LABEL_MAP = {
+    "benchpressing": "bench_pressing",
+    "frontraise": "front_raise",
+    "jump_jack": "jump_jacks",
+    "jumpjacks": "jump_jacks",
+    "pullups": "pull_up",
+    "pushups": "push_up",
+    "situp": "sit_up",
+    "squant": "squat",
+}
+
+
+def default_annotation_csvs() -> list[Path]:
+    cleaned = sorted(ANNOTATION_CLEANED_DIR.glob("*_cleaned.csv"))
+    if cleaned:
+        return cleaned
+    return sorted(ANNOTATION_DIR.glob("*.csv"))
 
 
 def parse_args() -> argparse.Namespace:
@@ -25,8 +50,11 @@ def parse_args() -> argparse.Namespace:
         "--annotation-csv",
         type=Path,
         nargs="+",
-        default=sorted(ANNOTATION_CLEANED_DIR.glob("*_cleaned.csv")),
-        help="One or more cleaned annotation CSV files.",
+        default=default_annotation_csvs(),
+        help=(
+            "One or more annotation CSV files. Defaults to cleaned CSVs when they exist, "
+            "otherwise falls back to raw split files under Data/LLSP/annotation."
+        ),
     )
     parser.add_argument(
         "--exercise",
@@ -50,18 +78,34 @@ def parse_args() -> argparse.Namespace:
 
 
 def normalize_label(value: str) -> str:
-    return value.strip().lower()
+    normalized = value.strip().lower()
+    return CANONICAL_LABEL_MAP.get(normalized, normalized)
+
+
+def infer_split(annotation_csv: Path, row: Dict[str, str]) -> str:
+    split_value = row.get("split", "").strip().lower()
+    if split_value:
+        return split_value
+
+    stem = annotation_csv.stem.strip().lower()
+    if stem in {"train", "valid", "test"}:
+        return stem
+
+    raise ValueError(
+        f"Could not infer split for row {row.get('name', '<unknown>')} from {annotation_csv}"
+    )
 
 
 def load_rows(annotation_csvs: Iterable[Path], exercise: str | None, feature_dir: Path) -> List[Dict[str, str]]:
     wanted = normalize_label(exercise) if exercise else None
     rows: List[Dict[str, str]] = []
     seen_names = set()
+    skipped_missing_count: list[str] = []
 
     for annotation_csv in annotation_csvs:
         with annotation_csv.open(newline="", encoding="utf-8") as f:
             reader = csv.DictReader(f)
-            required = {"type", "name", "count", "split"}
+            required = {"type", "name", "count"}
             missing = required - set(reader.fieldnames or [])
             if missing:
                 raise ValueError(f"{annotation_csv} is missing columns: {sorted(missing)}")
@@ -69,9 +113,14 @@ def load_rows(annotation_csvs: Iterable[Path], exercise: str | None, feature_dir
             for row in reader:
                 exercise_name = normalize_label(row["type"])
                 video_name = row["name"].strip()
+                split_name = infer_split(annotation_csv, row)
                 if wanted and exercise_name != wanted:
                     continue
                 if video_name in seen_names:
+                    continue
+                count = row["count"].strip()
+                if not count:
+                    skipped_missing_count.append(video_name)
                     continue
 
                 seen_names.add(video_name)
@@ -80,10 +129,17 @@ def load_rows(annotation_csvs: Iterable[Path], exercise: str | None, feature_dir
                         "name": video_name,
                         "feature_path": str((feature_dir / f"{Path(video_name).stem}.npy").resolve()),
                         "type": exercise_name,
-                        "split": row["split"].strip(),
-                        "count": row["count"].strip(),
+                        "split": split_name,
+                        "count": count,
                     }
                 )
+
+    if skipped_missing_count:
+        preview = ", ".join(skipped_missing_count[:5])
+        print(
+            f"Skipped {len(skipped_missing_count)} row(s) with missing count"
+            f" while building the pose feature index: {preview}"
+        )
 
     return rows
 
