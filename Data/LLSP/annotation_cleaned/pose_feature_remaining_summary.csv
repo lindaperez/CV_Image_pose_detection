@@ -1,0 +1,11 @@
+type,expected,existing,missing,train_expected,train_existing,valid_expected,valid_existing,test_expected,test_existing
+battle_rope,16,0,16,13,0,3,0,0,0
+bench_pressing,125,0,125,93,0,13,0,19,0
+front_raise,130,1,129,93,1,19,0,18,0
+jump_jacks,117,0,117,76,0,15,0,26,0
+others,38,0,38,37,0,0,0,1,0
+pommelhorse,99,0,99,69,0,15,0,15,0
+pull_up,127,0,127,94,0,14,0,19,0
+push_up,123,0,123,89,0,18,0,16,0
+sit_up,131,0,131,93,0,18,0,20,0
+squat,135,117,18,101,101,16,16,18,0

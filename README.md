@@ -6,6 +6,48 @@ The codebase includes data preparation, pose extraction, feature construction, m
 
 In this README, `LLSP` refers to the local exercise-video dataset folder used by the project.
 
+## Submission Quickstart
+
+All commands in this README assume the current working directory is the folder containing this file.
+
+Clone the submission repository, enter the project subfolder, create a virtual environment, and install dependencies:
+
+```bash
+git clone https://github.khoury.northeastern.edu/khouryquanxing/CS5330_SP26_Group1.git
+cd CS5330_SP26_Group1/CV_Image_pose_detection-main
+python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install --upgrade pip
+python3 -m pip install -r requirements-pose.txt
+```
+
+Run the lightweight regression tests:
+
+```bash
+python tests/run_tests.py --list
+python tests/run_tests.py all
+```
+
+Open the static project pages locally:
+
+```bash
+python3 -m http.server 8000
+```
+
+Then visit:
+
+```text
+http://localhost:8000/index.html
+```
+
+Runtime examples that read LLSP videos or saved model outputs require the local dataset/artifact folders documented below:
+
+- `Data/LLSP/video/`
+- `Data/LLSP/annotation_cleaned/`
+- `artifacts/3_Modeling/training_outputs/`
+
+If those folders are not present after cloning, download the LLSP assets from the dataset link in this README or regenerate the artifacts using the staged notebooks and scripts in the run order below.
+
 ## Executive Summary
 
 This project delivers:
@@ -94,17 +136,17 @@ Example usage from the repository root:
 
 ```bash
 source .venv/bin/activate
-python3 CV_Image_pose_detection/artifacts/3_Modeling/run_squat_counter.py \
-  --video-path CV_Image_pose_detection/Data/LLSP/video/valid/train3946.mp4 \
-  --output-json CV_Image_pose_detection/artifacts/3_Modeling/training_outputs/train3946_squat_runtime.json \
+python3 artifacts/3_Modeling/run_squat_counter.py \
+  --video-path Data/LLSP/video/valid/train3946.mp4 \
+  --output-json artifacts/3_Modeling/training_outputs/train3946_squat_runtime.json \
   --pretty
 ```
 
 Force the TCN explicitly:
 
 ```bash
-python3 CV_Image_pose_detection/artifacts/3_Modeling/run_squat_counter.py \
-  --feature-path CV_Image_pose_detection/Data/LLSP/annotation_cleaned/squat_features/train3946_squat_features.npy \
+python3 artifacts/3_Modeling/run_squat_counter.py \
+  --feature-path Data/LLSP/annotation_cleaned/squat_features/train3946_squat_features.npy \
   --counter-backend tcn \
   --pretty
 ```
@@ -112,8 +154,8 @@ python3 CV_Image_pose_detection/artifacts/3_Modeling/run_squat_counter.py \
 Use the FSM reference path explicitly:
 
 ```bash
-python3 CV_Image_pose_detection/artifacts/3_Modeling/run_squat_counter.py \
-  --feature-path CV_Image_pose_detection/Data/LLSP/annotation_cleaned/squat_features/train3946_squat_features.npy \
+python3 artifacts/3_Modeling/run_squat_counter.py \
+  --feature-path Data/LLSP/annotation_cleaned/squat_features/train3946_squat_features.npy \
   --counter-backend fsm \
   --pretty
 ```
@@ -141,7 +183,7 @@ Example run:
 
 ```bash
 source .venv/bin/activate
-python3 CV_Image_pose_detection/artifacts/3_Modeling/run_live_squat_counter.py \
+python3 artifacts/3_Modeling/run_live_squat_counter.py \
   --mirror \
   --tcn-device cpu
 ```
@@ -150,7 +192,7 @@ Start recording immediately on launch:
 
 ```bash
 source .venv/bin/activate
-python3 CV_Image_pose_detection/artifacts/3_Modeling/run_live_squat_counter.py \
+python3 artifacts/3_Modeling/run_live_squat_counter.py \
   --mirror \
   --tcn-device cpu \
   --auto-record
@@ -170,7 +212,7 @@ This live path remains a squat-only research prototype. It demonstrates interact
 
 ## Testing
 
-The script-level tests are organized into grouped `unittest` suites under [tests/README.md](/Users/lindaperez/Documents/COMPUTER_VISION/Final_project/personal-git/CV_Image_pose_detection/tests/README.md):
+The script-level tests are organized into grouped `unittest` suites under [tests/README.md](tests/README.md):
 
 - `data_prep`
 - `evaluation`
@@ -182,16 +224,16 @@ Quick usage from the repo root:
 
 ```bash
 source .venv/bin/activate
-python CV_Image_pose_detection/tests/run_tests.py --list
-python CV_Image_pose_detection/tests/run_tests.py runtime
-python CV_Image_pose_detection/tests/run_tests.py all
+python tests/run_tests.py --list
+python tests/run_tests.py runtime
+python tests/run_tests.py all
 ```
 
 The full discovery command still works:
 
 ```bash
 source .venv/bin/activate
-python -m unittest discover -s CV_Image_pose_detection/tests -p 'test_*.py'
+python -m unittest discover -s tests -p 'test_*.py'
 ```
 
 ## Project Status
@@ -234,7 +276,7 @@ If a more detailed contribution breakdown is needed for submission, this section
 ## Repository Layout
 
 ```text
-CV_Image_pose_detection/
+.
 ├── Data/
 │   ├── Countix/
 │   │   ├── annotation_cleaned/         # optional Countix benchmark artifacts
@@ -249,7 +291,7 @@ CV_Image_pose_detection/
 │   ├── 2_Data_preparation/             # preparation notebooks
 │   └── 3_Modeling/                     # pose extraction, feature extraction, modeling
 ├── resources/                          # project notes and study materials
-└── requirements-pose.txt               # minimal dependencies for pose extraction
+└── requirements-pose.txt               # Python dependencies for runnable scripts
 ```
 
 ## Folder Guide
@@ -412,19 +454,23 @@ Current synced pose coverage in this workspace:
 
 ## Environment Setup
 
-Create and activate a virtual environment, then install the pose dependencies:
+Create and activate a virtual environment, then install the project dependencies:
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 python3 -m pip install --upgrade pip
-python3 -m pip install -r CV_Image_pose_detection/requirements-pose.txt
+python3 -m pip install -r requirements-pose.txt
 ```
 
-Current pose extraction dependencies:
+Current Python dependencies for the runnable scripts:
 
 - `numpy`
 - `opencv-python`
+- `pandas`
+- `pillow`
+- `torch`
+- `torchvision`
 - `ultralytics`
 
 Optional tools used by the audit workflow:
@@ -435,7 +481,7 @@ Optional tools used by the audit workflow:
 To run the lightweight script-level tests:
 
 ```bash
-python3 -m unittest discover -s CV_Image_pose_detection/tests -p 'test_*.py'
+python3 -m unittest discover -s tests -p 'test_*.py'
 ```
 
 These tests complement, but do not replace, the staged Colab experiment validation used throughout the project.
@@ -457,7 +503,7 @@ This gives the project:
 The pose extraction scripts use the YOLO pose checkpoint currently stored at:
 
 ```text
-CV_Image_pose_detection/artifacts/3_Modeling/yolo11n-pose.pt
+artifacts/3_Modeling/yolo11n-pose.pt
 ```
 
 This file is already present in the workspace.
@@ -550,9 +596,9 @@ If you do not want to use Colab for pose extraction, the local script path is:
 After producing a new `predictions.csv` from the TCN training stage, apply the reviewed validation policy:
 
 ```bash
-python3 CV_Image_pose_detection/artifacts/3_Modeling/apply_validation_review_policy.py \
-  --predictions-csv CV_Image_pose_detection/artifacts/3_Modeling/training_outputs/<run_name>/predictions.csv \
-  --review-csv CV_Image_pose_detection/artifacts/3_Modeling/validation_failure_review.csv
+python3 artifacts/3_Modeling/apply_validation_review_policy.py \
+  --predictions-csv artifacts/3_Modeling/training_outputs/<run_name>/predictions.csv \
+  --review-csv artifacts/3_Modeling/validation_failure_review.csv
 ```
 
 This writes:
@@ -570,8 +616,8 @@ next to the supplied `predictions.csv`, so the project keeps both:
 After producing a final `predictions.csv`, estimate uncertainty on the reported metrics:
 
 ```bash
-python3 CV_Image_pose_detection/artifacts/3_Modeling/bootstrap_count_confidence_intervals.py \
-  --predictions-csv CV_Image_pose_detection/artifacts/3_Modeling/training_outputs/<run_name>/predictions.csv \
+python3 artifacts/3_Modeling/bootstrap_count_confidence_intervals.py \
+  --predictions-csv artifacts/3_Modeling/training_outputs/<run_name>/predictions.csv \
   --exercise squat \
   --split valid \
   --bootstrap-samples 5000 \
@@ -589,11 +635,11 @@ This writes `bootstrap_confidence_intervals.json` beside the selected `predictio
 To turn the heuristic `7D` audit into a confirmed review layer, first build a manual-review manifest:
 
 ```bash
-python3 CV_Image_pose_detection/artifacts/3_Modeling/build_hard_case_review_manifest.py \
-  --audit-csv CV_Image_pose_detection/artifacts/3_Modeling/training_outputs/rgb_count_tcn_squat_seq256/hard_case_audit.csv \
-  --audit-csv CV_Image_pose_detection/artifacts/3_Modeling/training_outputs/rgb_count_tcn_pull_up_seq192/hard_case_audit.csv \
-  --audit-csv CV_Image_pose_detection/artifacts/3_Modeling/training_outputs/rgb_count_tcn_push_up_seq128/hard_case_audit.csv \
-  --output-csv CV_Image_pose_detection/artifacts/3_Modeling/training_outputs/hard_case_review_manifest.csv
+python3 artifacts/3_Modeling/build_hard_case_review_manifest.py \
+  --audit-csv artifacts/3_Modeling/training_outputs/rgb_count_tcn_squat_seq256/hard_case_audit.csv \
+  --audit-csv artifacts/3_Modeling/training_outputs/rgb_count_tcn_pull_up_seq192/hard_case_audit.csv \
+  --audit-csv artifacts/3_Modeling/training_outputs/rgb_count_tcn_push_up_seq128/hard_case_audit.csv \
+  --output-csv artifacts/3_Modeling/training_outputs/hard_case_review_manifest.csv
 ```
 
 Then fill the manual columns in `hard_case_review_manifest.csv`, especially:
@@ -678,14 +724,14 @@ When served from the repo root, the default video base path in the app is:
 That maps to the local folder:
 
 ```text
-/Users/lindaperez/Documents/COMPUTER_VISION/Final_project/personal-git/CV_Image_pose_detection/Data/LLSP/video
+Data/LLSP/video
 ```
 
 After review, summarize the confirmed issues:
 
 ```bash
-python3 CV_Image_pose_detection/artifacts/3_Modeling/summarize_reviewed_hard_cases.py \
-  --review-csv CV_Image_pose_detection/artifacts/3_Modeling/training_outputs/hard_case_review_manifest.csv
+python3 artifacts/3_Modeling/summarize_reviewed_hard_cases.py \
+  --review-csv artifacts/3_Modeling/training_outputs/hard_case_review_manifest.csv
 ```
 
 This writes:
@@ -700,15 +746,15 @@ The goal is to distinguish confirmed data-side problems, label ambiguity, and tr
 Generate an index for every cleaned sample:
 
 ```bash
-python3 CV_Image_pose_detection/artifacts/3_Modeling/build_pose_feature_index.py
+python3 artifacts/3_Modeling/build_pose_feature_index.py
 ```
 
 Generate a squat-only index:
 
 ```bash
-python3 CV_Image_pose_detection/artifacts/3_Modeling/build_pose_feature_index.py \
+python3 artifacts/3_Modeling/build_pose_feature_index.py \
   --exercise squat \
-  --output-csv CV_Image_pose_detection/Data/LLSP/annotation_cleaned/pose_feature_index_squat.csv
+  --output-csv Data/LLSP/annotation_cleaned/pose_feature_index_squat.csv
 ```
 
 The generated CSV maps each video name to a target `.npy` output path and preserves the exercise label, split, and rep count.
@@ -716,14 +762,14 @@ The generated CSV maps each video name to a target `.npy` output path and preser
 Generate the full multi-exercise index:
 
 ```bash
-python3 CV_Image_pose_detection/artifacts/3_Modeling/build_pose_feature_index.py \
-  --output-csv CV_Image_pose_detection/Data/LLSP/annotation_cleaned/pose_feature_index.csv
+python3 artifacts/3_Modeling/build_pose_feature_index.py \
+  --output-csv Data/LLSP/annotation_cleaned/pose_feature_index.csv
 ```
 
 Build the missing-only worklist for the remaining exercises:
 
 ```bash
-python3 CV_Image_pose_detection/artifacts/3_Modeling/build_remaining_pose_worklist.py \
+python3 artifacts/3_Modeling/build_remaining_pose_worklist.py \
   --exclude-exercise others
 ```
 
@@ -732,19 +778,19 @@ python3 CV_Image_pose_detection/artifacts/3_Modeling/build_remaining_pose_workli
 Run extraction from an existing index:
 
 ```bash
-python3 CV_Image_pose_detection/artifacts/3_Modeling/pose_feature_extraction.py \
-  --index-csv CV_Image_pose_detection/Data/LLSP/annotation_cleaned/pose_feature_index.csv \
-  --video-dir CV_Image_pose_detection/Data/LLSP/video \
-  --model CV_Image_pose_detection/artifacts/3_Modeling/yolo11n-pose.pt
+python3 artifacts/3_Modeling/pose_feature_extraction.py \
+  --index-csv Data/LLSP/annotation_cleaned/pose_feature_index.csv \
+  --video-dir Data/LLSP/video \
+  --model artifacts/3_Modeling/yolo11n-pose.pt
 ```
 
 Useful debugging example:
 
 ```bash
-python3 CV_Image_pose_detection/artifacts/3_Modeling/pose_feature_extraction.py \
-  --index-csv CV_Image_pose_detection/Data/LLSP/annotation_cleaned/pose_feature_index_squat.csv \
-  --video-dir CV_Image_pose_detection/Data/LLSP/video \
-  --model CV_Image_pose_detection/artifacts/3_Modeling/yolo11n-pose.pt \
+python3 artifacts/3_Modeling/pose_feature_extraction.py \
+  --index-csv Data/LLSP/annotation_cleaned/pose_feature_index_squat.csv \
+  --video-dir Data/LLSP/video \
+  --model artifacts/3_Modeling/yolo11n-pose.pt \
   --max-videos 5 \
   --overwrite
 ```
@@ -775,14 +821,14 @@ The audit script joins summary statistics with local videos and tags common fail
 It expects the squat feature summary generated in the squat feature extraction workflow, typically:
 
 ```text
-CV_Image_pose_detection/Data/LLSP/annotation_cleaned/squat_feature_summary.csv
+Data/LLSP/annotation_cleaned/squat_feature_summary.csv
 ```
 
 Example:
 
 ```bash
-python3 CV_Image_pose_detection/artifacts/3_Modeling/analyze_squat_video_quality.py \
-  --summary-csv CV_Image_pose_detection/Data/LLSP/annotation_cleaned/squat_feature_summary.csv
+python3 artifacts/3_Modeling/analyze_squat_video_quality.py \
+  --summary-csv Data/LLSP/annotation_cleaned/squat_feature_summary.csv
 ```
 
 Audit outputs are written to `artifacts/3_Modeling/squat_video_audit/`.
@@ -872,6 +918,27 @@ Current reportable metrics with `95%` bootstrap confidence intervals:
   - `MAE = 6.6018`, `95% CI [3.3063, 10.4238]`
   - `RMSE = 10.2865`, `95% CI [5.1748, 14.8974]`
   - `Within-1 = 0.2778`, `95% CI [0.0556, 0.5000]`
+
+## System Limitations & Future Work
+
+Current limitations:
+
+- The live and packaged runtime path is intentionally squat-only; the broader exercise-dependent routing study is validated through offline artifacts and notebooks.
+- The project assumes the exercise label is known at inference time. It does not yet include a production-ready exercise-recognition layer.
+- The validation subsets for the primary reportable exercises are small (`n=16` squat, `n=14` pull-up, `n=18` push-up), so the confidence intervals are wide and the conclusions should be treated as scoped research evidence.
+- The strongest result is exercise-dependent, not a universal architecture. Squat is best supported by dedicated pose features, push-up by RGB features, and pull-up remains sensitive to viewpoint and target-selection ambiguity.
+- Runtime inference from raw video depends on local LLSP video files and saved model artifacts. The README documents the required folders and the dataset link, but large local assets are not all committed directly to Git.
+- Most model-training workflows remain notebook-first because GPU-heavy experiments were run in Colab.
+
+Future work:
+
+- Package the routed multi-exercise counter behind a single inference entry point once the required model artifacts are finalized.
+- Add an exercise classifier so the system no longer requires the exercise type to be supplied at inference time.
+- Increase validation coverage or use cross-validation over the train/validation pool while keeping the test set held out.
+- Evaluate stronger pose backbones and target-person tracking for difficult viewpoints, occlusion, and multi-person scenes.
+- Replace simple late fusion with a learned modality-selection or confidence-aware fusion strategy.
+- Move notebook-only training logic into reusable Python modules and add a documented end-to-end training/evaluation command.
+- Extend the live prototype beyond squat only after the offline routed system is stable.
 
 ## Notes and Caveats
 

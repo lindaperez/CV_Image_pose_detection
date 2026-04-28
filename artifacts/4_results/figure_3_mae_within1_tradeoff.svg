@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="650" viewBox="0 0 1080 650">
+<style>
+text { font-family: Arial, Helvetica, sans-serif; fill: #1f2933; }
+.title { font-size: 24px; font-weight: 700; }
+.subtitle { font-size: 14px; fill: #52606d; }
+.axis { stroke: #9aa5b1; stroke-width: 1; }
+.grid { stroke: #e4e7eb; stroke-width: 1; }
+.label { font-size: 12px; }
+.small { font-size: 11px; fill: #52606d; }
+.bold { font-size: 12px; font-weight: 700; }
+</style>
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="48.0" y="42.0" class="title">MAE vs Within-1 Tradeoff</text>
+<text x="48.0" y="66.0" class="subtitle">Selected branches are outlined. The plot shows why routing should not be described as lowest-MAE only.</text>
+<line x1="105.0" y1="105.0" x2="105.0" y2="525.0" stroke="#e4e7eb" stroke-width="1.0"/>
+<text x="105.0" y="549.0" class="small" text-anchor="middle">0</text>
+<line x1="238.3" y1="105.0" x2="238.3" y2="525.0" stroke="#e4e7eb" stroke-width="1.0"/>
+<text x="238.3" y="549.0" class="small" text-anchor="middle">2</text>
+<line x1="371.7" y1="105.0" x2="371.7" y2="525.0" stroke="#e4e7eb" stroke-width="1.0"/>
+<text x="371.7" y="549.0" class="small" text-anchor="middle">4</text>
+<line x1="505.0" y1="105.0" x2="505.0" y2="525.0" stroke="#e4e7eb" stroke-width="1.0"/>
+<text x="505.0" y="549.0" class="small" text-anchor="middle">6</text>
+<line x1="638.3" y1="105.0" x2="638.3" y2="525.0" stroke="#e4e7eb" stroke-width="1.0"/>
+<text x="638.3" y="549.0" class="small" text-anchor="middle">8</text>
+<line x1="771.7" y1="105.0" x2="771.7" y2="525.0" stroke="#e4e7eb" stroke-width="1.0"/>
+<text x="771.7" y="549.0" class="small" text-anchor="middle">10</text>
+<line x1="905.0" y1="105.0" x2="905.0" y2="525.0" stroke="#e4e7eb" stroke-width="1.0"/>
+<text x="905.0" y="549.0" class="small" text-anchor="middle">12</text>
+<line x1="105.0" y1="525.0" x2="905.0" y2="525.0" stroke="#e4e7eb" stroke-width="1.0"/>
+<text x="95.0" y="529.0" class="small" text-anchor="end">0.0</text>
+<line x1="105.0" y1="460.4" x2="905.0" y2="460.4" stroke="#e4e7eb" stroke-width="1.0"/>
+<text x="95.0" y="464.4" class="small" text-anchor="end">0.1</text>
+<line x1="105.0" y1="395.8" x2="905.0" y2="395.8" stroke="#e4e7eb" stroke-width="1.0"/>
+<text x="95.0" y="399.8" class="small" text-anchor="end">0.2</text>
+<line x1="105.0" y1="331.2" x2="905.0" y2="331.2" stroke="#e4e7eb" stroke-width="1.0"/>
+<text x="95.0" y="335.2" class="small" text-anchor="end">0.3</text>
+<line x1="105.0" y1="266.5" x2="905.0" y2="266.5" stroke="#e4e7eb" stroke-width="1.0"/>
+<text x="95.0" y="270.5" class="small" text-anchor="end">0.4</text>
+<line x1="105.0" y1="201.9" x2="905.0" y2="201.9" stroke="#e4e7eb" stroke-width="1.0"/>
+<text x="95.0" y="205.9" class="small" text-anchor="end">0.5</text>
+<line x1="105.0" y1="137.3" x2="905.0" y2="137.3" stroke="#e4e7eb" stroke-width="1.0"/>
+<text x="95.0" y="141.3" class="small" text-anchor="end">0.6</text>
+<line x1="105.0" y1="72.7" x2="905.0" y2="72.7" stroke="#e4e7eb" stroke-width="1.0"/>
+<text x="95.0" y="76.7" class="small" text-anchor="end">0.7</text>
+<line x1="105.0" y1="105.0" x2="105.0" y2="525.0" stroke="#9aa5b1" stroke-width="1.0"/>
+<line x1="105.0" y1="525.0" x2="905.0" y2="525.0" stroke="#9aa5b1" stroke-width="1.0"/>
+<text x="505.0" y="580.0" class="label" text-anchor="middle">MAE, lower is better</text>
+<text x="24.0" y="315.0" class="label" transform="rotate(-90 24 315.0)" text-anchor="middle">Within-1, higher is better</text>
+<circle cx="309.2" cy="161.5" r="6.0" fill="#4477AA" stroke="#ffffff" stroke-width="1"/>
+<circle cx="247.7" cy="161.5" r="8.0" fill="#4477AA" stroke="#111827" stroke-width="2"/>
+<circle cx="641.2" cy="363.5" r="6.0" fill="#4477AA" stroke="#ffffff" stroke-width="1"/>
+<circle cx="412.3" cy="248.1" r="8.0" fill="#228833" stroke="#111827" stroke-width="2"/>
+<circle cx="696.5" cy="525.0" r="6.0" fill="#CC6677" stroke="#ffffff" stroke-width="1"/>
+<polygon points="715.0,438.2 721.0,450.2 709.0,450.2" fill="#4477AA" stroke="#ffffff" stroke-width="1"/>
+<polygon points="439.7,472.9 445.7,484.9 433.7,484.9" fill="#228833" stroke="#ffffff" stroke-width="1"/>
+<polygon points="602.1,483.1 608.1,495.1 596.1,495.1" fill="#CC6677" stroke="#ffffff" stroke-width="1"/>
+<rect x="535.3" y="478.6" width="12.0" height="12.0" fill="#4477AA" stroke="#ffffff" stroke-width="1"/>
+<rect x="423.6" y="426.7" width="12.0" height="12.0" fill="#228833" stroke="#ffffff" stroke-width="1"/>
+<rect x="537.1" y="337.5" width="16.0" height="16.0" fill="#CC6677" stroke="#111827" stroke-width="2"/>
+<rect x="460.6" y="397.8" width="12.0" height="12.0" fill="#4477AA" stroke="#ffffff" stroke-width="1"/>
+<rect x="378.9" y="288.3" width="12.0" height="12.0" fill="#228833" stroke="#ffffff" stroke-width="1"/>
+<rect x="590.8" y="483.1" width="12.0" height="12.0" fill="#CC6677" stroke="#ffffff" stroke-width="1"/>
+<circle cx="551.6" cy="525.0" r="6.0" fill="#4477AA" stroke="#ffffff" stroke-width="1"/>
+<circle cx="379.6" cy="432.7" r="6.0" fill="#228833" stroke="#ffffff" stroke-width="1"/>
+<circle cx="516.3" cy="453.2" r="6.0" fill="#CC6677" stroke="#ffffff" stroke-width="1"/>
+<circle cx="341.4" cy="340.4" r="6.0" fill="#228833" stroke="#ffffff" stroke-width="1"/>
+<text x="242.7" y="141.5" class="small">Dedicated squat TCN</text>
+<text x="424.3" y="238.1" class="small">Shared pose TCN</text>
+<text x="557.1" y="337.5" class="small">RGB ResNet18 TCN</text>
+<text x="353.4" y="364.4" class="small">Lower-MAE pull-up alternatives</text>
+<text x="528.3" y="477.2" class="small">Fusion lower MAE, weaker W1</text>
+<text x="930.0" y="130.0" class="bold">Exercise</text>
+<circle cx="938.0" cy="153.0" r="6.0" fill="#4477AA" stroke="#ffffff" stroke-width="1.0"/>
+<text x="954.0" y="158.0" class="small">Squat</text>
+<circle cx="938.0" cy="179.0" r="6.0" fill="#228833" stroke="#ffffff" stroke-width="1.0"/>
+<text x="954.0" y="184.0" class="small">Pull-up</text>
+<circle cx="938.0" cy="205.0" r="6.0" fill="#CC6677" stroke="#ffffff" stroke-width="1.0"/>
+<text x="954.0" y="210.0" class="small">Push-up</text>
+<text x="930.0" y="260.0" class="bold">Marker</text>
+<circle cx="938.0" cy="288.0" r="6.0" fill="#6b7280" stroke="#ffffff" stroke-width="1.0"/>
+<text x="954.0" y="293.0" class="small">Pose/FSM</text>
+<rect x="932.0" y="308.0" width="12.0" height="12.0" fill="#6b7280" stroke="none" stroke-width="1.0"/>
+<text x="954.0" y="319.0" class="small">RGB</text>
+<polygon points="938.0,334.0 945.0,348.0 931.0,348.0" fill="#6b7280" stroke="#ffffff" stroke-width="1.0"/>
+<text x="954.0" y="348.0" class="small">Transformer</text>
+<text x="48.0" y="610.0" class="small">Caption: Exact-count reliability can change the selected branch even when another model has a lower MAE.</text>
+</svg>

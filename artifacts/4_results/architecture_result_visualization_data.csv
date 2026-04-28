@@ -1,0 +1,19 @@
+architecture,exercise,mae,rmse,within_1,selected
+FSM baseline,squat,3.0625,4.9181,0.5625,False
+Dedicated squat TCN,squat,2.1405,3.1016,0.5625,True
+Shared pose TCN,squat,8.043,11.1896,0.25,False
+Shared pose TCN,pull_up,4.6088,7.0169,0.4286,True
+Shared pose TCN,push_up,8.8724,11.2798,0.0,False
+Pose Transformer,squat,9.1502,,0.125,False
+Pose Transformer,pull_up,5.021,,0.0714,False
+Pose Transformer,push_up,7.4561,,0.0556,False
+RGB ResNet18 TCN,squat,6.5446,8.2765,0.0625,False
+RGB ResNet18 TCN,pull_up,4.8686,,0.1429,False
+RGB ResNet18 TCN,push_up,6.6018,10.2865,0.2778,True
+RGB ResNet50 TCN,squat,5.4245,6.8711,0.1875,False
+RGB ResNet50 TCN,pull_up,4.1992,5.8931,0.3571,False
+RGB ResNet50 TCN,push_up,7.3768,,0.0556,False
+Multimodal fusion,squat,6.6988,8.2765,0.0,False
+Multimodal fusion,pull_up,4.1193,5.2182,0.1429,False
+Multimodal fusion,push_up,6.1691,9.8993,0.1111,False
+Dedicated pull-up pose,pull_up,3.5463,,0.2857,False

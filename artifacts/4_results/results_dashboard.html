@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Exercise Counting Results Visualizations</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      color: #1f2933;
+      background: #f8fafc;
+    }
+    header {
+      padding: 32px 40px 20px;
+      background: #ffffff;
+      border-bottom: 1px solid #d9e2ec;
+    }
+    main {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 24px 28px 48px;
+    }
+    section {
+      margin-bottom: 32px;
+      background: #ffffff;
+      border: 1px solid #d9e2ec;
+      border-radius: 8px;
+      padding: 20px;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 28px;
+    }
+    h2 {
+      margin: 0 0 16px;
+      font-size: 18px;
+    }
+    p {
+      margin: 0;
+      color: #52606d;
+    }
+    img {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Exercise Counting Results Visualizations</h1>
+    <p>Generated from the project result matrix and reportable routed metrics.</p>
+  </header>
+  <main>
+
+      <section>
+        <h2>Final routed performance with confidence intervals</h2>
+        <img src="figure_1_routed_performance_ci.svg" alt="Final routed performance with confidence intervals">
+      </section>
+      <section>
+        <h2>Architecture comparison heatmap</h2>
+        <img src="figure_2_architecture_mae_heatmap.svg" alt="Architecture comparison heatmap">
+      </section>
+      <section>
+        <h2>MAE versus Within-1 tradeoff</h2>
+        <img src="figure_3_mae_within1_tradeoff.svg" alt="MAE versus Within-1 tradeoff">
+      </section>
+      <section>
+        <h2>Per-exercise architecture comparison</h2>
+        <img src="figure_4_per_exercise_mae_comparison.svg" alt="Per-exercise architecture comparison">
+      </section>
+      <section>
+        <h2>Result-driven routed architecture</h2>
+        <img src="figure_5_routed_architecture.svg" alt="Result-driven routed architecture">
+      </section>
+  </main>
+</body>
+</html>

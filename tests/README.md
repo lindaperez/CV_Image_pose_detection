@@ -22,18 +22,18 @@ From the repo root:
 
 ```bash
 source .venv/bin/activate
-python CV_Image_pose_detection/tests/run_tests.py --list
-python CV_Image_pose_detection/tests/run_tests.py data_prep
-python CV_Image_pose_detection/tests/run_tests.py review
-python CV_Image_pose_detection/tests/run_tests.py runtime
-python CV_Image_pose_detection/tests/run_tests.py all
+python tests/run_tests.py --list
+python tests/run_tests.py data_prep
+python tests/run_tests.py review
+python tests/run_tests.py runtime
+python tests/run_tests.py all
 ```
 
 For the full legacy discovery run:
 
 ```bash
 source .venv/bin/activate
-python -m unittest discover -s CV_Image_pose_detection/tests -p 'test_*.py'
+python -m unittest discover -s tests -p 'test_*.py'
 ```
 
 ## Scope

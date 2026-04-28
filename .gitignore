@@ -2,6 +2,12 @@
 .DS_Store
 **/.DS_Store
 .ipynb_checkpoints/
+**/.ipynb_checkpoints/
+
+# Local environments
+.venv/
+venv/
+env/
 
 # Python cache files
 __pycache__/
@@ -13,12 +19,25 @@ Data/RepCountA.tar
 Data/LLSP/video/
 Data/Countix/video/
 
+# Large raw media and archives
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.webm
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+
 # Large generated feature stores
 Data/LLSP/annotation_cleaned/pose_features/
 Data/LLSP/annotation_cleaned/pose_sequences/
 Data/LLSP/annotation_cleaned/rgb_resnet18_features/
 Data/LLSP/annotation_cleaned/rgb_resnet50_features/
 Data/LLSP/annotation_cleaned/squat_features/
+*.npy
+*.npz
 
 # Large EDA exports
 artifacts/1_EDA/*.pdf
@@ -27,3 +46,7 @@ artifacts/1_EDA/pdfs/
 # Local checkpoints and model outputs
 artifacts/3_Modeling/yolo11n-pose.pt
 artifacts/3_Modeling/training_outputs/
+artifacts/3_Modeling/T/
+*.pt
+*.pth
+*.onnx

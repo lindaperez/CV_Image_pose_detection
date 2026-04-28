@@ -71,6 +71,7 @@ class LiveSquatCounterTest(unittest.TestCase):
         self.assertTrue(MODULE.is_stop_record_key(ord("e")))
         self.assertFalse(MODULE.is_stop_record_key(ord("q")))
 
+    @unittest.skipIf(MODULE.np is None, "NumPy is required for movement-state feature rows")
     def test_update_live_movement_state_counts_two_cycles(self) -> None:
         np = MODULE.np
         state = MODULE.reset_live_movement_state()

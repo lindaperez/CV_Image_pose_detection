@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="560" viewBox="0 0 1120 560">
+<style>
+text { font-family: Arial, Helvetica, sans-serif; fill: #1f2933; }
+.title { font-size: 24px; font-weight: 700; }
+.subtitle { font-size: 14px; fill: #52606d; }
+.axis { stroke: #9aa5b1; stroke-width: 1; }
+.grid { stroke: #e4e7eb; stroke-width: 1; }
+.label { font-size: 12px; }
+.small { font-size: 11px; fill: #52606d; }
+.bold { font-size: 12px; font-weight: 700; }
+</style>
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="48.0" y="42.0" class="title">Final Routed Performance With 95% Bootstrap Confidence Intervals</text>
+<text x="48.0" y="66.0" class="subtitle">Selected branch per exercise. Lower MAE is better; higher Within-1 is better.</text>
+<text x="88.0" y="104.0" class="bold">A. Mean Absolute Error</text>
+<text x="88.0" y="122.0" class="small">Repetition count error</text>
+<line x1="88.0" y1="430.0" x2="508.0" y2="430.0" stroke="#e4e7eb" stroke-width="1.0"/>
+<text x="80.0" y="434.0" class="small" text-anchor="end">0</text>
+<line x1="88.0" y1="377.3" x2="508.0" y2="377.3" stroke="#e4e7eb" stroke-width="1.0"/>
+<text x="80.0" y="381.3" class="small" text-anchor="end">2</text>
+<line x1="88.0" y1="324.5" x2="508.0" y2="324.5" stroke="#e4e7eb" stroke-width="1.0"/>
+<text x="80.0" y="328.5" class="small" text-anchor="end">4</text>
+<line x1="88.0" y1="271.8" x2="508.0" y2="271.8" stroke="#e4e7eb" stroke-width="1.0"/>
+<text x="80.0" y="275.8" class="small" text-anchor="end">6</text>
+<line x1="88.0" y1="219.1" x2="508.0" y2="219.1" stroke="#e4e7eb" stroke-width="1.0"/>
+<text x="80.0" y="223.1" class="small" text-anchor="end">8</text>
+<line x1="88.0" y1="166.4" x2="508.0" y2="166.4" stroke="#e4e7eb" stroke-width="1.0"/>
+<text x="80.0" y="170.4" class="small" text-anchor="end">10</text>
+<line x1="88.0" y1="140.0" x2="88.0" y2="430.0" stroke="#9aa5b1" stroke-width="1.0"/>
+<line x1="88.0" y1="430.0" x2="508.0" y2="430.0" stroke="#9aa5b1" stroke-width="1.0"/>
+<rect x="137.5" y="373.6" width="74.0" height="56.4" fill="#4477AA" stroke="none" stroke-width="1.0" rx="4"/>
+<line x1="174.5" y1="400.3" x2="174.5" y2="342.2" stroke="#1f2933" stroke-width="1.5"/>
+<line x1="163.5" y1="400.3" x2="185.5" y2="400.3" stroke="#1f2933" stroke-width="1.5"/>
+<line x1="163.5" y1="342.2" x2="185.5" y2="342.2" stroke="#1f2933" stroke-width="1.5"/>
+<text x="174.5" y="365.6" class="bold" text-anchor="middle">2.14</text>
+<text x="174.5" y="452.0" class="label" text-anchor="middle">Squat</text>
+<text x="174.5" y="468.0" class="small" text-anchor="middle">n=16</text>
+<rect x="261.0" y="308.5" width="74.0" height="121.5" fill="#228833" stroke="none" stroke-width="1.0" rx="4"/>
+<line x1="298.0" y1="375.0" x2="298.0" y2="231.3" stroke="#1f2933" stroke-width="1.5"/>
+<line x1="287.0" y1="375.0" x2="309.0" y2="375.0" stroke="#1f2933" stroke-width="1.5"/>
+<line x1="287.0" y1="231.3" x2="309.0" y2="231.3" stroke="#1f2933" stroke-width="1.5"/>
+<text x="298.0" y="300.5" class="bold" text-anchor="middle">4.61</text>
+<text x="298.0" y="452.0" class="label" text-anchor="middle">Pull-up</text>
+<text x="298.0" y="468.0" class="small" text-anchor="middle">n=14</text>
+<rect x="384.5" y="256.0" width="74.0" height="174.0" fill="#CC6677" stroke="none" stroke-width="1.0" rx="4"/>
+<line x1="421.5" y1="342.8" x2="421.5" y2="155.2" stroke="#1f2933" stroke-width="1.5"/>
+<line x1="410.5" y1="342.8" x2="432.5" y2="342.8" stroke="#1f2933" stroke-width="1.5"/>
+<line x1="410.5" y1="155.2" x2="432.5" y2="155.2" stroke="#1f2933" stroke-width="1.5"/>
+<text x="421.5" y="248.0" class="bold" text-anchor="middle">6.60</text>
+<text x="421.5" y="452.0" class="label" text-anchor="middle">Push-up</text>
+<text x="421.5" y="468.0" class="small" text-anchor="middle">n=18</text>
+<text x="650.0" y="104.0" class="bold">B. Within-1 Accuracy</text>
+<text x="650.0" y="122.0" class="small">Fraction of videos within one repetition</text>
+<line x1="650.0" y1="430.0" x2="1010.0" y2="430.0" stroke="#e4e7eb" stroke-width="1.0"/>
+<text x="642.0" y="434.0" class="small" text-anchor="end">0.0</text>
+<line x1="650.0" y1="372.0" x2="1010.0" y2="372.0" stroke="#e4e7eb" stroke-width="1.0"/>
+<text x="642.0" y="376.0" class="small" text-anchor="end">0.2</text>
+<line x1="650.0" y1="314.0" x2="1010.0" y2="314.0" stroke="#e4e7eb" stroke-width="1.0"/>
+<text x="642.0" y="318.0" class="small" text-anchor="end">0.4</text>
+<line x1="650.0" y1="256.0" x2="1010.0" y2="256.0" stroke="#e4e7eb" stroke-width="1.0"/>
+<text x="642.0" y="260.0" class="small" text-anchor="end">0.6</text>
+<line x1="650.0" y1="198.0" x2="1010.0" y2="198.0" stroke="#e4e7eb" stroke-width="1.0"/>
+<text x="642.0" y="202.0" class="small" text-anchor="end">0.8</text>
+<line x1="650.0" y1="140.0" x2="1010.0" y2="140.0" stroke="#e4e7eb" stroke-width="1.0"/>
+<text x="642.0" y="144.0" class="small" text-anchor="end">1.0</text>
+<line x1="650.0" y1="140.0" x2="650.0" y2="430.0" stroke="#9aa5b1" stroke-width="1.0"/>
+<line x1="650.0" y1="430.0" x2="1010.0" y2="430.0" stroke="#9aa5b1" stroke-width="1.0"/>
+<rect x="684.5" y="266.9" width="74.0" height="163.1" fill="#4477AA" stroke="none" stroke-width="1.0" rx="4"/>
+<line x1="721.5" y1="339.4" x2="721.5" y2="194.4" stroke="#1f2933" stroke-width="1.5"/>
+<line x1="710.5" y1="339.4" x2="732.5" y2="339.4" stroke="#1f2933" stroke-width="1.5"/>
+<line x1="710.5" y1="194.4" x2="732.5" y2="194.4" stroke="#1f2933" stroke-width="1.5"/>
+<text x="721.5" y="258.9" class="bold" text-anchor="middle">0.56</text>
+<text x="721.5" y="452.0" class="label" text-anchor="middle">Squat</text>
+<text x="721.5" y="468.0" class="small" text-anchor="middle">n=16</text>
+<rect x="793.0" y="305.7" width="74.0" height="124.3" fill="#228833" stroke="none" stroke-width="1.0" rx="4"/>
+<line x1="830.0" y1="367.9" x2="830.0" y2="222.9" stroke="#1f2933" stroke-width="1.5"/>
+<line x1="819.0" y1="367.9" x2="841.0" y2="367.9" stroke="#1f2933" stroke-width="1.5"/>
+<line x1="819.0" y1="222.9" x2="841.0" y2="222.9" stroke="#1f2933" stroke-width="1.5"/>
+<text x="830.0" y="297.7" class="bold" text-anchor="middle">0.43</text>
+<text x="830.0" y="452.0" class="label" text-anchor="middle">Pull-up</text>
+<text x="830.0" y="468.0" class="small" text-anchor="middle">n=14</text>
+<rect x="901.5" y="349.4" width="74.0" height="80.6" fill="#CC6677" stroke="none" stroke-width="1.0" rx="4"/>
+<line x1="938.5" y1="413.9" x2="938.5" y2="285.0" stroke="#1f2933" stroke-width="1.5"/>
+<line x1="927.5" y1="413.9" x2="949.5" y2="413.9" stroke="#1f2933" stroke-width="1.5"/>
+<line x1="927.5" y1="285.0" x2="949.5" y2="285.0" stroke="#1f2933" stroke-width="1.5"/>
+<text x="938.5" y="341.4" class="bold" text-anchor="middle">0.28</text>
+<text x="938.5" y="452.0" class="label" text-anchor="middle">Push-up</text>
+<text x="938.5" y="468.0" class="small" text-anchor="middle">n=18</text>
+<text x="48.0" y="510.0" class="small">Caption: Final routed counting results across the three reportable exercises. Error bars show 95% bootstrap confidence intervals.</text>
+</svg>
