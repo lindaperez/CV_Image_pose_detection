@@ -1,4 +1,0 @@
-exercise,selected_branch,n,mae,mae_ci_low,mae_ci_high,rmse,rmse_ci_low,rmse_ci_high,within_1,within_1_ci_low,within_1_ci_high
-squat,Dedicated squat pose TCN,16,2.1405,1.1266,3.3313,3.1016,1.6982,4.2837,0.5625,0.3125,0.8125
-pull_up,Shared pose TCN,14,4.6088,2.0863,7.5386,7.0169,3.5909,9.7687,0.4286,0.2143,0.7143
-push_up,RGB ResNet18 + TCN,18,6.6018,3.3063,10.4238,10.2865,5.1748,14.8974,0.2778,0.0556,0.5

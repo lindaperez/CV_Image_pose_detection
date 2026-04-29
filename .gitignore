@@ -18,6 +18,9 @@ __pycache__/
 Data/RepCountA.tar
 Data/LLSP/video/
 Data/Countix/video/
+datasets/raw/
+datasets/interim/
+datasets/generated/
 
 # Large raw media and archives
 *.mp4
@@ -39,14 +42,13 @@ Data/LLSP/annotation_cleaned/squat_features/
 *.npy
 *.npz
 
-# Large EDA exports
-artifacts/1_EDA/*.pdf
-artifacts/1_EDA/pdfs/
+# Local generated outputs
+outputs/
+artifacts/3_Modeling/training_outputs/
+artifacts/3_Modeling/T/
 
 # Local checkpoints and model outputs
 artifacts/3_Modeling/yolo11n-pose.pt
-artifacts/3_Modeling/training_outputs/
-artifacts/3_Modeling/T/
 *.pt
 *.pth
 *.onnx

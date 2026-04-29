@@ -1,0 +1,671 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hard-Case Review Manifest Viewer</title>
+  <style>
+    :root {
+      --bg: #f6f1e8;
+      --panel: #fffdf8;
+      --ink: #1f1d1a;
+      --muted: #6c655b;
+      --line: #ddd2c4;
+      --accent: #b84c2a;
+      --ok: #2d6a4f;
+      --warn: #8d6a17;
+      --shadow: 0 10px 30px rgba(32, 26, 18, 0.08);
+      --radius: 18px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(184, 76, 42, 0.12), transparent 28%),
+        linear-gradient(180deg, #fbf8f3 0%, var(--bg) 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .shell {
+      max-width: 1440px;
+      margin: 0 auto;
+      display: grid;
+      gap: 18px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 18px 20px;
+    }
+
+    h1,
+    h2 {
+      margin: 0;
+      line-height: 1.2;
+    }
+
+    h1 {
+      font-size: 1.8rem;
+      margin-bottom: 6px;
+    }
+
+    h2 {
+      font-size: 1rem;
+      margin-bottom: 12px;
+    }
+
+    p {
+      margin: 0;
+      line-height: 1.5;
+      color: var(--muted);
+    }
+
+    .hero {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      align-items: flex-start;
+    }
+
+    .hero-meta {
+      display: grid;
+      gap: 8px;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .button {
+      border: 0;
+      border-radius: 999px;
+      padding: 10px 14px;
+      background: var(--ink);
+      color: #fff;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      cursor: pointer;
+      font: inherit;
+    }
+
+    .button.secondary {
+      background: #e7ddd1;
+      color: var(--ink);
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .analysis-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .analysis-card {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: #fff;
+      padding: 14px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .analysis-card h3 {
+      margin: 0;
+      font-size: 0.95rem;
+    }
+
+    .analysis-card ul {
+      margin: 0;
+      padding-left: 18px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .analysis-card li + li {
+      margin-top: 6px;
+    }
+
+    .insight-strip {
+      border: 1px dashed var(--line);
+      border-radius: 14px;
+      background: #fffcf7;
+      padding: 14px;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .stat {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #fff;
+      padding: 12px;
+    }
+
+    .stat strong {
+      display: block;
+      font-size: 1.4rem;
+      color: var(--accent);
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: minmax(260px, 1fr) minmax(180px, 240px);
+      gap: 12px;
+    }
+
+    label {
+      display: block;
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    input,
+    select {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: #fff;
+      color: var(--ink);
+      font: inherit;
+    }
+
+    .table-wrap {
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: #fff;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 1100px;
+    }
+
+    thead th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: #f7efe5;
+      color: var(--ink);
+      text-align: left;
+      font-size: 0.8rem;
+      letter-spacing: 0.02em;
+      border-bottom: 1px solid var(--line);
+    }
+
+    th,
+    td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #efe4d6;
+      vertical-align: top;
+      white-space: normal;
+      line-height: 1.35;
+    }
+
+    tbody tr:hover {
+      background: #fffaf5;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      font-size: 0.75rem;
+      background: #fff;
+      color: var(--muted);
+    }
+
+    .badge.reviewed,
+    .badge.confirmed {
+      color: var(--ok);
+      background: rgba(45, 106, 79, 0.08);
+      border-color: rgba(45, 106, 79, 0.22);
+    }
+
+    .badge.pending {
+      color: var(--warn);
+      background: rgba(141, 106, 23, 0.08);
+      border-color: rgba(141, 106, 23, 0.22);
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .empty {
+      text-align: center;
+      padding: 28px;
+      color: var(--muted);
+    }
+
+    @media (max-width: 960px) {
+      .stats,
+      .controls,
+      .analysis-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <section class="panel hero">
+      <div class="hero-meta">
+        <div>
+          <h1>Saved Review Manifest</h1>
+          <p>Readable view of the autosaved `hard_case_review_manifest.csv`.</p>
+        </div>
+        <div id="manifest-meta" class="muted">Loading manifest...</div>
+      </div>
+      <div class="hero-actions">
+        <a id="raw-csv-link" class="button secondary" href="#" target="_blank" rel="noopener noreferrer">Open raw CSV</a>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="stats">
+        <div class="stat">
+          <strong id="stat-total">0</strong>
+          <span>Total rows</span>
+        </div>
+        <div class="stat">
+          <strong id="stat-reviewed">0</strong>
+          <span>Reviewed</span>
+        </div>
+        <div class="stat">
+          <strong id="stat-confirmed">0</strong>
+          <span>Confirmed</span>
+        </div>
+        <div class="stat">
+          <strong id="stat-pending">0</strong>
+          <span>Pending</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Data Scientist Analysis</h2>
+      <p id="analysis-subtitle">Loading reviewed-case summary...</p>
+      <div class="analysis-grid">
+        <article class="analysis-card">
+          <h3>Coverage</h3>
+          <ul id="analysis-coverage">
+            <li>Loading...</li>
+          </ul>
+        </article>
+        <article class="analysis-card">
+          <h3>Dominant Failure Modes</h3>
+          <ul id="analysis-failures">
+            <li>Loading...</li>
+          </ul>
+        </article>
+        <article class="analysis-card">
+          <h3>Label Vs. Data Signal</h3>
+          <ul id="analysis-label-data">
+            <li>Loading...</li>
+          </ul>
+        </article>
+      </div>
+      <div id="analysis-insight" class="insight-strip">Loading insight...</div>
+    </section>
+
+    <section class="panel">
+      <div class="controls">
+        <div>
+          <label for="search-input">Search rows</label>
+          <input id="search-input" type="text" placeholder="filename, issue tag, note...">
+        </div>
+        <div>
+          <label for="status-filter">Filter by review status</label>
+          <select id="status-filter">
+            <option value="">All statuses</option>
+            <option value="pending">pending</option>
+            <option value="reviewed">reviewed</option>
+            <option value="confirmed">confirmed</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Exercise</th>
+              <th>Split</th>
+              <th>True count</th>
+              <th>Review status</th>
+              <th>Primary issue</th>
+              <th>Issue tags</th>
+              <th>Count label OK</th>
+              <th>Rep ambiguous</th>
+              <th>Keep for report</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody id="table-body">
+            <tr><td colspan="11" class="empty">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const VIEWER_PATH_MARKER = "/src/rep_counter/hard_case_review_manifest_viewer.html";
+      function inferRepoRootPath() {
+        const pathname = window.location.pathname || "/";
+        const markerIndex = pathname.indexOf(VIEWER_PATH_MARKER);
+        if (markerIndex >= 0) {
+          return pathname.slice(0, markerIndex + 1);
+        }
+        return "/";
+      }
+
+      const REPO_ROOT_PATH = inferRepoRootPath();
+      const params = new URLSearchParams(window.location.search);
+      const relativePath = params.get("relative_path") || "src/rep_counter/training_outputs/hard_case_review_manifest.csv";
+      const defaultApiBase = (() => {
+        const origin = window.location.origin && window.location.origin !== "null"
+          ? window.location.origin
+          : "http://127.0.0.1:8000";
+        const cleanRoot = REPO_ROOT_PATH.endsWith("/") ? REPO_ROOT_PATH.slice(0, -1) : REPO_ROOT_PATH;
+        return `${origin}${cleanRoot}/api`;
+      })();
+      const apiBase = (() => {
+        const raw = params.get("api_base") || defaultApiBase;
+        const normalized = raw.replace(/\/+$/, "");
+        return /\/api$/i.test(normalized) ? normalized : `${normalized}/api`;
+      })();
+
+      const DOM = {
+        manifestMeta: document.getElementById("manifest-meta"),
+        rawCsvLink: document.getElementById("raw-csv-link"),
+        statTotal: document.getElementById("stat-total"),
+        statReviewed: document.getElementById("stat-reviewed"),
+        statConfirmed: document.getElementById("stat-confirmed"),
+        statPending: document.getElementById("stat-pending"),
+        analysisSubtitle: document.getElementById("analysis-subtitle"),
+        analysisCoverage: document.getElementById("analysis-coverage"),
+        analysisFailures: document.getElementById("analysis-failures"),
+        analysisLabelData: document.getElementById("analysis-label-data"),
+        analysisInsight: document.getElementById("analysis-insight"),
+        searchInput: document.getElementById("search-input"),
+        statusFilter: document.getElementById("status-filter"),
+        tableBody: document.getElementById("table-body"),
+      };
+
+      const state = {
+        headers: [],
+        rows: [],
+      };
+
+      function parseCsv(text) {
+        const rows = [];
+        let current = "";
+        let row = [];
+        let insideQuotes = false;
+
+        for (let i = 0; i < text.length; i += 1) {
+          const char = text[i];
+          const next = text[i + 1];
+
+          if (char === "\"") {
+            if (insideQuotes && next === "\"") {
+              current += "\"";
+              i += 1;
+            } else {
+              insideQuotes = !insideQuotes;
+            }
+            continue;
+          }
+          if (char === "," && !insideQuotes) {
+            row.push(current);
+            current = "";
+            continue;
+          }
+          if ((char === "\n" || char === "\r") && !insideQuotes) {
+            if (char === "\r" && next === "\n") {
+              i += 1;
+            }
+            row.push(current);
+            current = "";
+            if (row.some((value) => value !== "")) {
+              rows.push(row);
+            }
+            row = [];
+            continue;
+          }
+          current += char;
+        }
+
+        if (current !== "" || row.length) {
+          row.push(current);
+          rows.push(row);
+        }
+
+        const headers = rows[0] || [];
+        const records = rows.slice(1).map((values) => {
+          const record = {};
+          headers.forEach((header, index) => {
+            record[header] = values[index] || "";
+          });
+          return record;
+        });
+        return { headers, records };
+      }
+
+      function normalizeStatus(value) {
+        const status = String(value || "").trim().toLowerCase();
+        if (["reviewed", "confirmed", "pending"].includes(status)) {
+          return status;
+        }
+        return status || "pending";
+      }
+
+      function filteredRows() {
+        const needle = DOM.searchInput.value.trim().toLowerCase();
+        const status = DOM.statusFilter.value.trim().toLowerCase();
+        return state.rows.filter((row) => {
+          if (status && normalizeStatus(row.manual_review_status) !== status) {
+            return false;
+          }
+          if (!needle) {
+            return true;
+          }
+          return Object.values(row).some((value) => String(value || "").toLowerCase().includes(needle));
+        });
+      }
+
+      function updateStats() {
+        const total = state.rows.length;
+        const reviewed = state.rows.filter((row) => normalizeStatus(row.manual_review_status) === "reviewed").length;
+        const confirmed = state.rows.filter((row) => normalizeStatus(row.manual_review_status) === "confirmed").length;
+        const pending = state.rows.filter((row) => normalizeStatus(row.manual_review_status) === "pending").length;
+
+        DOM.statTotal.textContent = String(total);
+        DOM.statReviewed.textContent = String(reviewed);
+        DOM.statConfirmed.textContent = String(confirmed);
+        DOM.statPending.textContent = String(pending);
+      }
+
+      function truthy(value) {
+        return ["yes", "y", "true", "1"].includes(String(value || "").trim().toLowerCase());
+      }
+
+      function summarizeAnalysis() {
+        const reviewedRows = state.rows.filter((row) => {
+          const status = normalizeStatus(row.manual_review_status);
+          return status === "reviewed" || status === "confirmed";
+        });
+
+        if (!reviewedRows.length) {
+          DOM.analysisSubtitle.textContent = "No reviewed rows yet. Save some reviewed cases to generate the analysis.";
+          DOM.analysisCoverage.innerHTML = "<li>No reviewed cases available.</li>";
+          DOM.analysisFailures.innerHTML = "<li>No reviewed cases available.</li>";
+          DOM.analysisLabelData.innerHTML = "<li>No reviewed cases available.</li>";
+          DOM.analysisInsight.textContent = "Once the team reviews cases, this panel will summarize the dominant failure modes and what they imply for the counting system.";
+          return;
+        }
+
+        const primaryCounts = new Map();
+        const exerciseCounts = new Map();
+        let labelIssueRows = 0;
+        let dataIssueRows = 0;
+        let rgbAdvRows = 0;
+        let keepForReportRows = 0;
+
+        reviewedRows.forEach((row) => {
+          const primary = (row.manual_primary_issue || "unspecified").trim() || "unspecified";
+          primaryCounts.set(primary, (primaryCounts.get(primary) || 0) + 1);
+
+          const exercise = (row.type || "unknown").trim() || "unknown";
+          exerciseCounts.set(exercise, (exerciseCounts.get(exercise) || 0) + 1);
+
+          if (truthy(row.manual_rep_definition_ambiguous) || String(row.manual_count_label_ok || "").trim().toLowerCase() === "no") {
+            labelIssueRows += 1;
+          }
+          if (
+            truthy(row.manual_visibility_issue_confirmed) ||
+            String(row.manual_target_person_ok || "").trim().toLowerCase() === "no" ||
+            truthy(row.manual_pose_failure_confirmed) ||
+            truthy(row.manual_rgb_context_advantage_confirmed)
+          ) {
+            dataIssueRows += 1;
+          }
+          if (truthy(row.manual_rgb_context_advantage_confirmed)) {
+            rgbAdvRows += 1;
+          }
+          if (truthy(row.manual_keep_for_report)) {
+            keepForReportRows += 1;
+          }
+        });
+
+        const reviewedCount = reviewedRows.length;
+        const coveragePct = state.rows.length ? Math.round((reviewedCount / state.rows.length) * 100) : 0;
+        const topIssues = Array.from(primaryCounts.entries()).sort((a, b) => b[1] - a[1]);
+        const topExercises = Array.from(exerciseCounts.entries()).sort((a, b) => b[1] - a[1]);
+        const labelPct = Math.round((labelIssueRows / reviewedCount) * 100);
+        const dataPct = Math.round((dataIssueRows / reviewedCount) * 100);
+        const rgbPct = Math.round((rgbAdvRows / reviewedCount) * 100);
+
+        DOM.analysisSubtitle.textContent = `${reviewedCount} reviewed cases out of ${state.rows.length} total hard cases (${coveragePct}% coverage).`;
+        DOM.analysisCoverage.innerHTML = [
+          `<li><strong>${reviewedCount}</strong> cases have a human review decision recorded.</li>`,
+          `<li>Most reviewed cases come from <strong>${topExercises.slice(0, 2).map(([exercise, count]) => `${exercise} (${count})`).join(", ") || "the current review subset"}</strong>.</li>`,
+          `<li><strong>${keepForReportRows}</strong> reviewed rows are already marked as worth keeping in the report.</li>`,
+        ].join("");
+
+        DOM.analysisFailures.innerHTML = topIssues.slice(0, 4).map(([issue, count], index) => {
+          const pct = Math.round((count / reviewedCount) * 100);
+          return `<li><strong>${index + 1}. ${issue}</strong>: ${count} cases (${pct}% of reviewed rows).</li>`;
+        }).join("") || "<li>No dominant failure modes recorded yet.</li>";
+
+        DOM.analysisLabelData.innerHTML = [
+          `<li><strong>${labelIssueRows}</strong> reviewed cases (${labelPct}%) include a count-label concern or rep-definition ambiguity.</li>`,
+          `<li><strong>${dataIssueRows}</strong> reviewed cases (${dataPct}%) show visibility, target-selection, pose, or RGB-context evidence.</li>`,
+          `<li><strong>${rgbAdvRows}</strong> reviewed cases (${rgbPct}%) explicitly confirm a true RGB context advantage.</li>`,
+        ].join("");
+
+        const dominantIssue = topIssues[0] ? topIssues[0][0] : "unspecified";
+        const dominantIssueCount = topIssues[0] ? topIssues[0][1] : 0;
+        const secondIssue = topIssues[1] ? `${topIssues[1][0]} (${topIssues[1][1]})` : "no secondary cluster yet";
+        const insightParts = [
+          `The reviewed subset is currently dominated by ${dominantIssue} (${dominantIssueCount}/${reviewedCount} cases), with ${secondIssue} as the next strongest cluster.`,
+          labelIssueRows >= dataIssueRows
+            ? "That suggests annotation ambiguity and rep-definition edge cases are at least as important as raw model weakness in the remaining errors."
+            : "That suggests the remaining errors are driven more by video/representation problems than by label issues alone.",
+          rgbAdvRows > 0
+            ? `Only ${rgbAdvRows} reviewed cases explicitly confirm a true RGB-context advantage, so RGB wins should be interpreted as selective rather than universal.`
+            : "No reviewed case yet shows a strong confirmed RGB-context advantage, so the current hard-case story is still more about geometry, tracking, and counting ambiguity.",
+        ];
+        DOM.analysisInsight.textContent = insightParts.join(" ");
+      }
+
+      function renderTable() {
+        const rows = filteredRows();
+        if (!rows.length) {
+          DOM.tableBody.innerHTML = '<tr><td colspan="11" class="empty">No rows match the current filters.</td></tr>';
+          return;
+        }
+        DOM.tableBody.innerHTML = rows.map((row) => {
+          const status = normalizeStatus(row.manual_review_status);
+          return `
+            <tr>
+              <td>${row.name || ""}</td>
+              <td>${row.type || ""}</td>
+              <td>${row.split || ""}</td>
+              <td>${row.true_count || ""}</td>
+              <td><span class="badge ${status}">${status}</span></td>
+              <td>${row.manual_primary_issue || '<span class="muted">unset</span>'}</td>
+              <td>${row.manual_issue_tags || '<span class="muted">none</span>'}</td>
+              <td>${row.manual_count_label_ok || '<span class="muted">unset</span>'}</td>
+              <td>${row.manual_rep_definition_ambiguous || '<span class="muted">unset</span>'}</td>
+              <td>${row.manual_keep_for_report || '<span class="muted">unset</span>'}</td>
+              <td>${row.manual_notes || '<span class="muted">—</span>'}</td>
+            </tr>
+          `;
+        }).join("");
+      }
+
+      async function loadManifest() {
+        DOM.rawCsvLink.href = `${REPO_ROOT_PATH}${relativePath.replace(/^\/+/, "")}`;
+        DOM.rawCsvLink.textContent = `Open raw CSV: ${relativePath}`;
+        try {
+          const response = await fetch(`${apiBase}/review-manifest/load?relative_path=${encodeURIComponent(relativePath)}`, { cache: "no-store" });
+          const payload = await response.json();
+          if (!response.ok || !payload.ok) {
+            throw new Error(payload && payload.error ? payload.error : `request failed with status ${response.status}`);
+          }
+          const { headers, records } = parseCsv(payload.csv_text || "");
+          state.headers = headers;
+          state.rows = records;
+          DOM.manifestMeta.textContent = `${payload.relative_path} • ${records.length} rows`;
+          updateStats();
+          summarizeAnalysis();
+          renderTable();
+        } catch (error) {
+          DOM.manifestMeta.textContent = `Failed to load ${relativePath}`;
+          DOM.tableBody.innerHTML = `<tr><td colspan="11" class="empty">${String(error.message || error)}</td></tr>`;
+        }
+      }
+
+      DOM.searchInput.addEventListener("input", renderTable);
+      DOM.statusFilter.addEventListener("change", renderTable);
+      loadManifest();
+    })();
+  </script>
+</body>
+</html>

@@ -26,7 +26,7 @@ The helper does not commit these files unless you stage and commit them manually
 From the repository root:
 
 ```bash
-cd /Users/lindaperez/Documents/COMPUTER_VISION/Final_project/personal-git/CV_Image_pose_detection
+cd /Users/lindaperez/Documents/COMPUTER_VISION/Final_project/personal-git/ML_System
 scripts/commit_code.py --dry-run
 ```
 

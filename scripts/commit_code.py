@@ -50,8 +50,12 @@ BLOCKED_PREFIXES = (
     "Data/LLSP/annotation_cleaned/rgb_resnet18_features/",
     "Data/LLSP/annotation_cleaned/rgb_resnet50_features/",
     "Data/LLSP/annotation_cleaned/squat_features/",
+    "datasets/generated/",
+    "datasets/interim/",
+    "datasets/raw/",
     "artifacts/3_Modeling/T/",
     "artifacts/3_Modeling/training_outputs/",
+    "outputs/",
 )
 
 
@@ -102,6 +106,12 @@ def changed_files() -> list[str]:
     return [path for path in result.stdout.split("\0") if path]
 
 
+def deleted_files() -> set[str]:
+    """Return tracked paths deleted from the working tree."""
+    result = run_git(["ls-files", "--deleted", "-z"])
+    return {path for path in result.stdout.split("\0") if path}
+
+
 def is_data_video(path: str) -> bool:
     """Return whether a path is under a dataset video directory."""
     parts = PurePosixPath(path).parts
@@ -129,13 +139,26 @@ def is_blocked_path(path: str) -> bool:
 
 def allowed_files(paths: list[str]) -> list[str]:
     """Filter changed files down to paths this helper may stage."""
-    return [path for path in paths if not is_blocked_path(path)]
+    deleted = deleted_files()
+    return [path for path in paths if path in deleted or not is_blocked_path(path)]
 
 
 def staged_files() -> list[str]:
     """Return names of currently staged files."""
     result = run_git(["diff", "--cached", "--name-only"])
     return [line for line in result.stdout.splitlines() if line]
+
+
+def staged_name_status() -> list[tuple[str, str]]:
+    """Return staged file status and path pairs."""
+    result = run_git(["diff", "--cached", "--name-status"])
+    pairs: list[tuple[str, str]] = []
+    for line in result.stdout.splitlines():
+        if not line:
+            continue
+        status, path = line.split(maxsplit=1)
+        pairs.append((status, path))
+    return pairs
 
 
 def stage_files(paths: list[str]) -> None:
@@ -185,7 +208,11 @@ def main() -> int:
 
     stage_files(allowed_files(changed_files()))
 
-    blocked_files = [path for path in staged_files() if is_blocked_path(path)]
+    blocked_files = [
+        path
+        for status, path in staged_name_status()
+        if status != "D" and is_blocked_path(path)
+    ]
     if blocked_files:
         print("error: blocked generated/local files are staged:", file=sys.stderr)
         print("\n".join(blocked_files), file=sys.stderr)

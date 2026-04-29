@@ -1,6 +1,0 @@
-name,split,true_count,pred_count,abs_error,audit_severity,classification,action,policy_tag,notes
-train3898.mp4,valid,2.0,4.908228,2.908228,critical,unusable_upstream_failure,exclude,unusable_pose,"Severe framing and occlusion. No valid lower-body frames."
-stu7_65.mp4,valid,9.0,9.132257,0.132257,medium,valid_harder_variation,keep,hard_case_variation,"Appears to be a Zercher squat / squat-style variation with partial lower-body visibility."
-stu10_63.mp4,valid,16.0,15.041590,0.958410,review,valid_framed_noisy_case,keep,hard_case_framed_noisy,"Portrait gym scene. Confidence noise, but usable motion geometry."
-test2349.mp4,valid,6.0,2.633353,3.366647,review,valid_low_quality_case,keep,hard_case_low_quality,"Low-resolution, portrait, low-FPS clip with moderate confidence noise."
-train3921.mp4,valid,4.0,3.844428,0.155572,ok,valid_contextual_hard_case,keep,hard_case_context_heavy,"Chair or box-assisted setup, surrounding equipment, and another visible person add semantic ambiguity."

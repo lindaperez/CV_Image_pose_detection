@@ -13,11 +13,11 @@ from test_utils import load_module
 
 build_review_manifest = load_module(
     "build_hard_case_review_manifest",
-    "artifacts/3_Modeling/build_hard_case_review_manifest.py",
+    "src/rep_counter/review/build_hard_case_review_manifest.py",
 )
 summarize_reviewed = load_module(
     "summarize_reviewed_hard_cases",
-    "artifacts/3_Modeling/summarize_reviewed_hard_cases.py",
+    "src/rep_counter/review/summarize_reviewed_hard_cases.py",
 )
 
 
