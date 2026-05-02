@@ -73,8 +73,8 @@
   const FIELD_HELP = {
     manual_target_person_ok: "Mark yes when the video clearly shows the correct person to count. Mark no when another person, a target switch, or ambiguous framing makes the counted subject uncertain.",
   };
-  const DEFAULT_MANIFEST_PATH = "../../outputs/training_outputs/hard_case_review_manifest.csv";
-  const DEFAULT_SERVER_SAVE_PATH = "outputs/training_outputs/hard_case_review_manifest.csv";
+  const DEFAULT_MANIFEST_PATH = "../../artifacts/3_Modeling/training_outputs/hard_case_review_manifest.csv";
+  const DEFAULT_SERVER_SAVE_PATH = "artifacts/3_Modeling/training_outputs/hard_case_review_manifest.csv";
   const LOCAL_STORAGE_KEY = "hard_case_review_app_state_v1";
   const APP_PATH_MARKER = "/reports/dashboards/hard_case_review_app.html";
   const COCO_EDGES = [
@@ -150,6 +150,10 @@
     mainInner: document.getElementById("main-inner"),
     statTotal: document.getElementById("stat-total"),
     statReviewed: document.getElementById("stat-reviewed"),
+    statPending: document.getElementById("stat-pending"),
+    statSkipped: document.getElementById("stat-skipped"),
+    progressBar: document.getElementById("progress-bar"),
+    progressPct: document.getElementById("progress-pct"),
   };
 
   const state = {
@@ -173,6 +177,87 @@
     DEFAULT_POSE_BASE_PATH,
     DEFAULT_ANNOTATION_BASE_PATH,
   };
+
+  /* ── Helper: error class for count comparison cards ────────────────── */
+  function errorClass(absError, trueCount) {
+    const err = Number(absError);
+    const tc  = Number(trueCount);
+    if (!Number.isFinite(err)) return "";
+    // Relative threshold when true count is small
+    if (Number.isFinite(tc) && tc > 0) {
+      const relErr = err / tc;
+      if (relErr <= 0.15 || err <= 1) return "ok";
+      if (relErr <= 0.40 || err <= 3) return "warn";
+      return "danger";
+    }
+    if (err <= 1) return "ok";
+    if (err <= 3) return "warn";
+    return "danger";
+  }
+
+  /* ── Helper: format count for display ──────────────────────────────── */
+  function formatCount(v) {
+    if (v == null || v === "") return "n/a";
+    const num = Number(v);
+    return Number.isFinite(num) ? num.toFixed(1) : "n/a";
+  }
+
+  /* ── Helper: count comparison cards HTML ───────────────────────────── */
+  function countCompareHTML(row) {
+    const posePred   = formatCount(row.pose_pred_count);
+    const rgbPred    = formatCount(row.rgb_pred_count);
+    const trueCount  = row.true_count || "?";
+    const poseErrCls = errorClass(row.pose_abs_error, row.true_count);
+    const rgbErrCls  = errorClass(row.rgb_abs_error,  row.true_count);
+    return `
+      <div class="count-compare-grid">
+        <div class="count-card ${poseErrCls}">
+          <div class="count-card-label">Pose model</div>
+          <div class="count-card-values">
+            <span class="count-pred">${posePred}</span>
+            <span class="count-sep">vs</span>
+            <span class="count-true">${trueCount} true</span>
+          </div>
+          <div class="count-card-error">Error: ${formatMetric(row.pose_abs_error)} reps</div>
+        </div>
+        <div class="count-card ${rgbErrCls}">
+          <div class="count-card-label">RGB model</div>
+          <div class="count-card-values">
+            <span class="count-pred">${rgbPred}</span>
+            <span class="count-sep">vs</span>
+            <span class="count-true">${trueCount} true</span>
+          </div>
+          <div class="count-card-error">Error: ${formatMetric(row.rgb_abs_error)} reps</div>
+        </div>
+      </div>
+    `;
+  }
+
+  /* ── Helper: model disagreement badge ──────────────────────────────── */
+  function disagreesBadge(row) {
+    const pose = Number(row.pose_pred_count);
+    const rgb  = Number(row.rgb_pred_count);
+    if (Number.isFinite(pose) && Number.isFinite(rgb) && Math.abs(pose - rgb) > 2) {
+      return `<span class="badge disagree">Models disagree</span>`;
+    }
+    return "";
+  }
+
+  /* ── Helper: semantic badge class for model_outcome / severity ─────── */
+  function outcomeBadgeClass(outcome) {
+    const o = String(outcome || "").toLowerCase();
+    if (o.includes("pass") || o.includes("correct")) return "ok";
+    if (o.includes("fail") || o.includes("miss"))    return "danger";
+    if (o.includes("warn") || o.includes("medium"))  return "warn";
+    return "";
+  }
+  function severityBadgeClass(sev) {
+    const s = String(sev || "").toLowerCase();
+    if (s === "high")   return "danger";
+    if (s === "medium") return "warn";
+    if (s === "low")    return "ok";
+    return "";
+  }
 
   function makeRowKey(row, index) {
     return [row.source_run_name || "", row.name || "", String(index)].join("::");
@@ -242,11 +327,15 @@
     const enabled = Boolean(state.rows.length);
     DOM.chooseAutosaveBtn.disabled = !enabled || !state.autosaveSupported;
     DOM.saveNowBtn.disabled = !enabled || (!state.backendAvailable && (!state.autosaveSupported || !state.autosaveHandle));
+    // Keep visible alias in sync
+    const saveToServerBtn = document.getElementById("save-to-server-btn");
+    if (saveToServerBtn) saveToServerBtn.disabled = DOM.saveNowBtn.disabled;
     updateServerSaveLink();
     updateAutosaveUi();
   }
 
   async function detectBackendAvailability() {
+    const dot = document.getElementById("backend-status-dot");
     try {
       const response = await fetch(buildApiUrl("health"), { cache: "no-store" });
       state.backendAvailable = response.ok;
@@ -254,8 +343,12 @@
       state.backendAvailable = false;
     }
     DOM.backendStatus.textContent = state.backendAvailable
-      ? `Backend status: connected (${normalizeBackendApiBase(DOM.backendApiBase.value)})`
-      : `Backend status: not detected (${normalizeBackendApiBase(DOM.backendApiBase.value)})`;
+      ? `connected (${normalizeBackendApiBase(DOM.backendApiBase.value)})`
+      : `not detected`;
+    if (dot) {
+      dot.classList.toggle("ok",  state.backendAvailable);
+      dot.classList.toggle("err", !state.backendAvailable);
+    }
     updateAutosaveControls();
   }
 
@@ -347,12 +440,20 @@
     return state.rows.filter((row) => ["reviewed", "confirmed"].includes(normalizeStatus(row.manual_review_status))).length;
   }
 
+  function pendingCount() {
+    return state.rows.filter((row) => normalizeStatus(row.manual_review_status) === "pending").length;
+  }
+
+  function skippedCount() {
+    return state.rows.filter((row) => normalizeStatus(row.manual_review_status) === "skipped").length;
+  }
+
   function formatMetric(value) {
     if (value == null || value === "") {
       return "n/a";
     }
     const num = Number(value);
-    return Number.isFinite(num) ? num.toFixed(2) : String(value);
+    return Number.isFinite(num) ? num.toFixed(1) : String(value);
   }
 
   function formatSeconds(value) {
@@ -416,7 +517,7 @@
   function parseNpyHeader(buffer) {
     const view = new DataView(buffer);
     const magic = String.fromCharCode(...new Uint8Array(buffer, 0, 6));
-    if (magic !== "\u0093NUMPY") {
+    if (magic !== "NUMPY") {
       throw new Error("Unsupported .npy file: invalid magic header");
     }
     const major = view.getUint8(6);
@@ -630,7 +731,7 @@
       activeNode.textContent = "none";
     }
 
-    summaryNode.textContent = `Annotated intervals: ${annotationData.intervals.length}`;
+    summaryNode.textContent = `${annotationData.intervals.length} intervals`;
     container.innerHTML = annotationData.intervals
       .map((interval) => {
         const secs = intervalSeconds(interval, fps);
@@ -638,8 +739,8 @@
         return `
           <div class="annotation-interval-chip ${isActive ? "active" : ""}">
             <strong>Rep ${interval.repIndex}</strong>
-            <span>frames ${interval.startFrame}-${interval.endFrame}</span>
-            <span>${secs ? `${formatSeconds(secs.startSec)}-${formatSeconds(secs.endSec)}` : "time n/a"}</span>
+            <span>frames ${interval.startFrame}–${interval.endFrame}</span>
+            <span>${secs ? `${formatSeconds(secs.startSec)}–${formatSeconds(secs.endSec)}` : "time n/a"}</span>
           </div>
         `;
       })
@@ -654,8 +755,6 @@
     if (canvas.width !== width || canvas.height !== height) {
       canvas.width = width;
       canvas.height = height;
-      canvas.style.width = `${rect.width}px`;
-      canvas.style.height = `${rect.height}px`;
     }
     return { width, height };
   }
@@ -673,6 +772,7 @@
     if (!poseData || poseData.status !== "ready" || !DOM.showPoseOverlay.checked) {
       return;
     }
+
     if (!video.videoWidth || !video.videoHeight || !poseData.frames) {
       return;
     }
@@ -756,7 +856,7 @@
     const fps = Number(row.fps);
     const currentFrame = Number.isFinite(fps) && fps > 0 ? video.currentTime * fps : NaN;
     if (fpsNode) {
-      fpsNode.textContent = Number.isFinite(fps) ? fps.toFixed(2) : "n/a";
+      fpsNode.textContent = Number.isFinite(fps) ? fps.toFixed(1) : "n/a";
     }
     if (frameNode) {
       frameNode.textContent = Number.isFinite(currentFrame) ? String(Math.max(0, Math.round(currentFrame))) : "n/a";
@@ -807,8 +907,21 @@
   }
 
   function updateStats() {
-    DOM.statTotal.textContent = String(state.rows.length);
-    DOM.statReviewed.textContent = String(reviewedCount());
+    const total    = state.rows.length;
+    const reviewed = reviewedCount();
+    const pending  = pendingCount();
+    const skipped  = skippedCount();
+    const pct      = total > 0 ? Math.round((reviewed / total) * 100) : 0;
+
+    DOM.statTotal.textContent    = String(total);
+    DOM.statReviewed.textContent = String(reviewed);
+    if (DOM.statPending)  DOM.statPending.textContent  = String(pending);
+    if (DOM.statSkipped)  DOM.statSkipped.textContent  = String(skipped);
+    if (DOM.progressBar)  {
+      DOM.progressBar.style.width = `${pct}%`;
+      DOM.progressBar.setAttribute("aria-valuenow", String(pct));
+    }
+    if (DOM.progressPct)  DOM.progressPct.textContent  = `${pct}%`;
   }
 
   function updateExerciseOptions() {
@@ -818,23 +931,38 @@
       .map((exercise) => `<option value="${exercise}">${exercise}</option>`)
       .join("")}`;
     DOM.filterExercise.value = exercises.includes(current) ? current : "";
+
+    // Also populate the visible filter-type select
+    const filterType = document.getElementById("filter-type");
+    if (filterType) {
+      filterType.innerHTML = `<option value="">All</option>${exercises
+        .map((exercise) => `<option value="${exercise}">${exercise}</option>`)
+        .join("")}`;
+    }
+
+    // Populate filter-bucket if bucket data exists
+    const filterBucket = document.getElementById("filter-bucket");
+    if (filterBucket) {
+      const buckets = Array.from(new Set(state.rows.map((row) => row.audit_bucket).filter(Boolean))).sort();
+      filterBucket.innerHTML = `<option value="">All</option>${buckets
+        .map((b) => `<option value="${b}">${b}</option>`)
+        .join("")}`;
+    }
   }
 
   function filteredRows() {
-    const exercise = DOM.filterExercise.value;
-    const status = DOM.filterStatus.value;
-    const search = DOM.filterSearch.value.trim().toLowerCase();
+    const exercise  = DOM.filterExercise.value;
+    const status    = DOM.filterStatus.value;
+    const search    = DOM.filterSearch.value.trim().toLowerCase();
+    const severity  = (document.getElementById("filter-severity") || {}).value || "";
+    const bucket    = (document.getElementById("filter-bucket")   || {}).value || "";
 
     return state.rows.filter((row) => {
-      if (exercise && row.type !== exercise) {
-        return false;
-      }
-      if (status && normalizeStatus(row.manual_review_status) !== status) {
-        return false;
-      }
-      if (search && !String(row.name || "").toLowerCase().includes(search)) {
-        return false;
-      }
+      if (exercise && row.type !== exercise) return false;
+      if (status   && normalizeStatus(row.manual_review_status) !== status) return false;
+      if (search   && !String(row.name || "").toLowerCase().includes(search)) return false;
+      if (severity && String(row.severity || "").toLowerCase() !== severity.toLowerCase()) return false;
+      if (bucket   && String(row.audit_bucket || "") !== bucket) return false;
       return true;
     });
   }
@@ -861,6 +989,7 @@
     if (!rows.length) {
       DOM.caseList.innerHTML = `
         <div class="empty-state">
+          <div class="empty-icon">&#128269;</div>
           <h2>No matching rows</h2>
           <p>Adjust the filters or load a manifest with hard-case rows.</p>
         </div>
@@ -871,17 +1000,21 @@
 
     DOM.caseList.innerHTML = rows
       .map((row) => {
-        const active = row.__key === state.selectedKey ? "active" : "";
-        const status = normalizeStatus(row.manual_review_status);
-        const statusClass = status === "pending" ? "warn" : "ok";
+        const active  = row.__key === state.selectedKey ? "active" : "";
+        const status  = normalizeStatus(row.manual_review_status);
+        const dotClass = status === "reviewed" ? "reviewed"
+                       : status === "confirmed" ? "confirmed"
+                       : status === "flagged"   ? "flagged"
+                       : "pending";
+        const typeLabel = row.type || "unknown";
         return `
-          <div class="case-item ${active}" data-row-key="${row.__key}">
-            <div class="case-item-title">${row.name || "unnamed row"}</div>
-            <div class="case-item-meta">${row.type || "unknown"} · priority ${row.review_priority || "?"} · ${row.model_outcome || "unknown"}</div>
-            <div class="badge-row">
-              <span class="badge ${statusClass}">${status}</span>
-              <span class="badge">${row.audit_bucket || "no bucket"}</span>
-              <span class="badge">${row.severity || "n/a"}</span>
+          <div class="case-item ${active}" data-row-key="${row.__key}"
+            role="listitem" tabindex="0"
+            aria-label="${row.name || "unnamed"} – ${status}">
+            <div class="case-status-dot ${dotClass}" aria-hidden="true"></div>
+            <div class="case-item-text">
+              <div class="case-item-name">${row.name || "unnamed row"}</div>
+              <div class="case-item-meta">${typeLabel} &middot; ${status}</div>
             </div>
           </div>
         `;
@@ -889,9 +1022,10 @@
       .join("");
 
     DOM.caseList.querySelectorAll(".case-item").forEach((item) => {
-      item.addEventListener("click", () => {
-        state.selectedKey = item.dataset.rowKey;
-        renderCaseList();
+      const activate = () => { state.selectedKey = item.dataset.rowKey; renderCaseList(); };
+      item.addEventListener("click", activate);
+      item.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); activate(); }
       });
     });
 
@@ -979,11 +1113,13 @@
     }).join("");
   }
 
+  /* ── renderMainPanel (was showReview) ──────────────────────────────── */
   function renderMainPanel() {
     const row = selectedRow();
     if (!row) {
       DOM.mainInner.innerHTML = `
         <div class="empty-state">
+          <div class="empty-icon">&#128270;</div>
           <h2>No row selected</h2>
           <p>Select a hard case on the left to start reviewing.</p>
         </div>
@@ -992,19 +1128,27 @@
     }
 
     const videoSrc = buildVideoSrc(row);
-    const poseSrc = buildPoseSrc(row);
-    const selectedTags = Array.from(currentTagSet(row));
+    const poseSrc  = buildPoseSrc(row);
+    const status   = normalizeStatus(row.manual_review_status);
+    const statusBadgeClass = status === "reviewed" || status === "confirmed" ? "ok"
+                           : status === "pending" ? "warn" : "";
+
     DOM.mainInner.innerHTML = `
-      <section class="hero">
-        <div class="video-card">
-          <h2>${row.name || "unnamed row"}</h2>
-          <p>${row.type || "unknown"} · split ${row.split || "n/a"} · source run ${row.source_run_name || "n/a"}</p>
-          <div class="badge-row">
-            <span class="badge">${row.model_outcome || "unknown outcome"}</span>
-            <span class="badge">${row.audit_bucket || "no heuristic bucket"}</span>
-            <span class="badge">${row.severity || "n/a"}</span>
-            <span class="badge ${normalizeStatus(row.manual_review_status) === "pending" ? "warn" : "ok"}">${normalizeStatus(row.manual_review_status)}</span>
+      <div class="workspace">
+
+        <!-- ── Column 1: Video ─────────────────────────────────────── -->
+        <div class="col-video card">
+          <div class="col-header">
+            <h2 title="${row.name || "unnamed row"}">${row.name || "unnamed row"}</h2>
+            <div class="badge-row">
+              <span class="badge ${outcomeBadgeClass(row.model_outcome)}">${row.model_outcome || "unknown outcome"}</span>
+              <span class="badge">${row.audit_bucket || "no bucket"}</span>
+              <span class="badge ${severityBadgeClass(row.severity)}">${row.severity || "n/a"}</span>
+              <span class="badge ${statusBadgeClass}">${status}</span>
+              ${disagreesBadge(row)}
+            </div>
           </div>
+
           <div class="video-stage">
             <video id="review-video" controls preload="metadata" playsinline src="${videoSrc}"></video>
             <canvas id="pose-overlay" class="pose-overlay"></canvas>
@@ -1014,172 +1158,157 @@
                 <div><strong>Exercise</strong><span>${row.type || "n/a"}</span></div>
                 <div><strong>Split</strong><span>${row.split || "n/a"}</span></div>
                 <div><strong>True count</strong><span>${row.true_count || "n/a"}</span></div>
-                <div><strong>Pose pred</strong><span>${row.pose_pred_count || "n/a"}</span></div>
-                <div><strong>RGB pred</strong><span>${row.rgb_pred_count || "n/a"}</span></div>
+                <div><strong>Pose pred</strong><span>${Number.isFinite(+row.pose_pred_count) ? (+row.pose_pred_count).toFixed(1) : "n/a"}</span></div>
+                <div><strong>RGB pred</strong><span>${Number.isFinite(+row.rgb_pred_count)  ? (+row.rgb_pred_count).toFixed(1)  : "n/a"}</span></div>
                 <div><strong>Outcome</strong><span>${row.model_outcome || "n/a"}</span></div>
                 <div><strong>FPS</strong><span id="annotation-fps">${row.fps || "n/a"}</span></div>
                 <div><strong>Frame</strong><span id="annotation-frame">n/a</span></div>
                 <div><strong>Time</strong><span><span id="annotation-current-time">0:00</span> / <span id="annotation-duration">0:00</span></span></div>
-                <div><strong>Review</strong><span id="annotation-review-status">${normalizeStatus(row.manual_review_status)}</span></div>
+                <div><strong>Review</strong><span id="annotation-review-status">${status}</span></div>
                 <div style="grid-column: 1 / -1;"><strong>Primary issue</strong><span id="annotation-manual-issue">${row.manual_primary_issue || "unset"}</span></div>
               </div>
             </div>
           </div>
+
+          <!-- Count comparison cards -->
+          ${countCompareHTML(row)}
+
           <div id="pose-overlay-status" class="pose-status">Pose overlay pending.</div>
-          <div class="video-fallback">
-            Video path: <code>${videoSrc || "not resolved"}</code><br>
-            <a href="${videoSrc || "#"}" target="_blank" rel="noopener noreferrer">Open video directly</a><br>
-            Pose path: <code>${poseSrc || "not resolved"}</code><br>
-            If the video does not load, adjust the base path at left or serve the repo root with <code>python3 src/rep_counter/review/hard_case_review_server.py --port 8000</code>.
-          </div>
+          <details class="video-debug">
+            <summary>Debug / paths</summary>
+            <div class="video-fallback">
+              Video: <code>${videoSrc || "not resolved"}</code><br>
+              <a href="${videoSrc || "#"}" target="_blank" rel="noopener noreferrer">Open video directly</a><br>
+              Pose: <code>${poseSrc || "not resolved"}</code><br>
+              Serve repo root: <code>python3 src/rep_counter/review/hard_case_review_server.py --port 8000</code>
+            </div>
+          </details>
         </div>
 
-        <div class="annotation-card">
-          <h2>Original annotation intervals</h2>
-          <div class="annotation-status">
-            <div class="annotation-status-head">
-              <strong>Interval review</strong>
-              <span id="annotation-interval-summary" class="helper">Loading annotation intervals...</span>
-            </div>
-            <div class="annotation-status-grid">
-              <div>
-                <strong>Current frame</strong>
-                <span id="annotation-current-frame">n/a</span>
+        <!-- ── Column 2: Annotation intervals ─────────────────────── -->
+        <div class="col-annotations card">
+          <h2>
+            Annotation intervals
+            <span class="interval-count-badge" id="annotation-interval-summary">…</span>
+          </h2>
+          <div class="ann-stats">
+            <div><span class="stat-label">Frame</span><span id="annotation-current-frame">n/a</span></div>
+            <div><span class="stat-label">Active interval</span><span id="annotation-active-interval">none</span></div>
+            <div class="dl-full" style="grid-column:1/-1"><span class="stat-label">Source</span><span id="annotation-source" class="helper">Loading…</span></div>
+          </div>
+          <div id="annotation-intervals" class="annotation-intervals"></div>
+        </div>
+
+        <!-- ── Column 3: Audit context + Manual review ─────────────── -->
+        <div class="col-review">
+
+          <!-- Audit context card -->
+          <div class="card audit-card">
+            <h2>Audit context</h2>
+            <dl class="meta-dl">
+              <div><dt>True count</dt><dd>${row.true_count || "n/a"}</dd></div>
+              <div><dt>Priority</dt><dd>${row.review_priority || "n/a"}</dd></div>
+              <div><dt>Pose error</dt><dd>${formatMetric(row.pose_abs_error)}</dd></div>
+              <div><dt>RGB error</dt><dd>${formatMetric(row.rgb_abs_error)}</dd></div>
+              <div class="dl-full"><dt>Heuristic tags</dt><dd>${row.issue_tags || "n/a"}</dd></div>
+              <div class="dl-full"><dt>Exercise · split · run</dt><dd>${row.type || "unknown"} · ${row.split || "n/a"} · ${row.source_run_name || "n/a"}</dd></div>
+            </dl>
+          </div>
+
+          <!-- Manual review card -->
+          <div class="card review-card-inner">
+            <h2>Manual review</h2>
+
+            <div class="form-row-2">
+              <div class="field">
+                <label for="manual-review-status">Status</label>
+                <select id="manual-review-status">
+                  ${optionMarkup(REVIEW_STATUSES, status)}
+                </select>
               </div>
-              <div>
-                <strong>Active interval</strong>
-                <span id="annotation-active-interval">none</span>
-              </div>
-              <div>
-                <strong>Source</strong>
-                <span id="annotation-source">Loading raw annotation row...</span>
+              <div class="field">
+                <label for="manual-primary-issue">Primary issue</label>
+                <select id="manual-primary-issue">
+                  ${primaryIssueOptions(row.manual_primary_issue || "")}
+                </select>
               </div>
             </div>
-            <div id="annotation-intervals" class="annotation-intervals"></div>
-          </div>
-        </div>
-      </section>
 
-      <section class="details-card">
-          <h2>Audit context</h2>
-          <div class="meta-grid">
-            <div>
-              <strong>True count</strong>
-              <small>${row.true_count || "n/a"}</small>
+            <div id="issue-guide-wrap">
+              ${issueGuideMarkup(row.manual_primary_issue || "")}
             </div>
-            <div>
-              <strong>Pose abs error</strong>
-              <small>${formatMetric(row.pose_abs_error)}</small>
-            </div>
-            <div>
-              <strong>RGB abs error</strong>
-              <small>${formatMetric(row.rgb_abs_error)}</small>
-            </div>
-            <div>
-              <strong>Review priority</strong>
-              <small>${row.review_priority || "n/a"}</small>
-            </div>
-            <div>
-              <strong>Heuristic issue tags</strong>
-              <small>${row.issue_tags || "n/a"}</small>
-            </div>
-            <div>
-              <strong>Current manual tags</strong>
-              <small>${selectedTags.length ? selectedTags.join(", ") : "none selected"}</small>
-            </div>
-          </div>
-      </section>
 
-      <section class="review-card">
-        <h2>Manual review</h2>
-        <p>Pick one main issue, add any secondary tags, and keep the booleans aligned with what you actually saw in the clip.</p>
+            <div class="form-row-2">
+              <div class="field">
+                <label for="manual-target-person-ok" title="${FIELD_HELP.manual_target_person_ok}">Target person OK</label>
+                <select id="manual-target-person-ok" title="${FIELD_HELP.manual_target_person_ok}">
+                  ${optionMarkup(YES_NO_OPTIONS, row.manual_target_person_ok || "")}
+                </select>
+              </div>
+              <div class="field">
+                <label for="manual-count-label-ok">Count label OK</label>
+                <select id="manual-count-label-ok">
+                  ${optionMarkup(YES_NO_OPTIONS, row.manual_count_label_ok || "")}
+                </select>
+              </div>
+              <div class="field">
+                <label for="manual-rep-definition-ambiguous">Rep def. ambiguous</label>
+                <select id="manual-rep-definition-ambiguous">
+                  ${optionMarkup(YES_NO_OPTIONS, row.manual_rep_definition_ambiguous || "")}
+                </select>
+              </div>
+              <div class="field">
+                <label for="manual-visibility-issue-confirmed">Visibility issue</label>
+                <select id="manual-visibility-issue-confirmed">
+                  ${optionMarkup(YES_NO_OPTIONS, row.manual_visibility_issue_confirmed || "")}
+                </select>
+              </div>
+              <div class="field">
+                <label for="manual-pose-failure-confirmed">Pose failure</label>
+                <select id="manual-pose-failure-confirmed">
+                  ${optionMarkup(YES_NO_OPTIONS, row.manual_pose_failure_confirmed || "")}
+                </select>
+              </div>
+              <div class="field">
+                <label for="manual-rgb-context-advantage-confirmed">RGB advantage</label>
+                <select id="manual-rgb-context-advantage-confirmed">
+                  ${optionMarkup(YES_NO_OPTIONS, row.manual_rgb_context_advantage_confirmed || "")}
+                </select>
+              </div>
+              <div class="field">
+                <label for="manual-keep-for-report">Keep for report</label>
+                <select id="manual-keep-for-report">
+                  ${optionMarkup(YES_NO_OPTIONS, row.manual_keep_for_report || "")}
+                </select>
+              </div>
+            </div>
 
-        <div class="review-grid">
-          <div>
-            <label for="manual-review-status">manual_review_status</label>
-            <select id="manual-review-status">
-              ${optionMarkup(REVIEW_STATUSES, normalizeStatus(row.manual_review_status))}
-            </select>
-          </div>
-          <div>
-            <label for="manual-primary-issue">manual_primary_issue</label>
-            <select id="manual-primary-issue">
-              ${primaryIssueOptions(row.manual_primary_issue || "")}
-            </select>
-          </div>
-        </div>
+            <div class="form-row-full">
+              <div class="field">
+                <label>Secondary tags</label>
+                <div class="tag-groups">
+                  ${tagGroupsMarkup(row)}
+                </div>
+              </div>
+              <div class="field">
+                <label for="manual-notes">Notes</label>
+                <textarea id="manual-notes" rows="4" placeholder="Short note about what you saw in the clip.">${row.manual_notes || ""}</textarea>
+              </div>
+            </div>
 
-        <div id="issue-guide-wrap">
-          ${issueGuideMarkup(row.manual_primary_issue || "")}
-        </div>
-
-        <div class="review-grid">
-          <div>
-            <label for="manual-target-person-ok" title="${FIELD_HELP.manual_target_person_ok}">manual_target_person_ok</label>
-            <select id="manual-target-person-ok" title="${FIELD_HELP.manual_target_person_ok}">
-              ${optionMarkup(YES_NO_OPTIONS, row.manual_target_person_ok || "")}
-            </select>
-          </div>
-          <div>
-            <label for="manual-count-label-ok">manual_count_label_ok</label>
-            <select id="manual-count-label-ok">
-              ${optionMarkup(YES_NO_OPTIONS, row.manual_count_label_ok || "")}
-            </select>
-          </div>
-          <div>
-            <label for="manual-rep-definition-ambiguous">manual_rep_definition_ambiguous</label>
-            <select id="manual-rep-definition-ambiguous">
-              ${optionMarkup(YES_NO_OPTIONS, row.manual_rep_definition_ambiguous || "")}
-            </select>
-          </div>
-          <div>
-            <label for="manual-visibility-issue-confirmed">manual_visibility_issue_confirmed</label>
-            <select id="manual-visibility-issue-confirmed">
-              ${optionMarkup(YES_NO_OPTIONS, row.manual_visibility_issue_confirmed || "")}
-            </select>
-          </div>
-          <div>
-            <label for="manual-pose-failure-confirmed">manual_pose_failure_confirmed</label>
-            <select id="manual-pose-failure-confirmed">
-              ${optionMarkup(YES_NO_OPTIONS, row.manual_pose_failure_confirmed || "")}
-            </select>
-          </div>
-          <div>
-            <label for="manual-rgb-context-advantage-confirmed">manual_rgb_context_advantage_confirmed</label>
-            <select id="manual-rgb-context-advantage-confirmed">
-              ${optionMarkup(YES_NO_OPTIONS, row.manual_rgb_context_advantage_confirmed || "")}
-            </select>
-          </div>
-          <div>
-            <label for="manual-keep-for-report">manual_keep_for_report</label>
-            <select id="manual-keep-for-report">
-              ${optionMarkup(YES_NO_OPTIONS, row.manual_keep_for_report || "")}
-            </select>
-          </div>
-        </div>
-
-        <div class="review-grid full">
-          <div>
-            <label>Secondary issue tags (multiple selection)</label>
-            <div class="tag-groups">
-              ${tagGroupsMarkup(row)}
+            <div class="review-footer">
+              <span class="helper">Drafts persist in the browser. Use Save to write through the backend or a local file.</span>
+              <div class="review-nav">
+                <button id="prev-row-btn" class="secondary" type="button">&#8592; Previous</button>
+                <button id="save-row-btn" type="button">Save review</button>
+                <button id="next-row-btn" type="button">Next &#8594;</button>
+              </div>
             </div>
           </div>
-          <div>
-            <label for="manual-notes">manual_notes</label>
-            <textarea id="manual-notes" placeholder="Short note about what you saw in the clip.">${row.manual_notes || ""}</textarea>
-          </div>
-        </div>
 
-        <div class="status-bar">
-          <div class="helper">Draft edits are kept in the browser while you navigate. Use Save now to write them through the backend or to your selected CSV.</div>
-          <div class="row">
-            <button id="prev-row-btn" class="secondary" type="button">Previous</button>
-            <button id="save-row-btn" type="button">Save current review</button>
-            <button id="next-row-btn" type="button">Next</button>
-          </div>
-        </div>
-      </section>
+        </div><!-- /col-review -->
+
+      </div><!-- /workspace -->
     `;
 
     wireRowEvents(row);
@@ -1315,6 +1444,7 @@
   function wireRowEvents(row) {
     const bindSelect = (id, field) => {
       const node = document.getElementById(id);
+      if (!node) return;
       node.addEventListener("change", (event) => {
         setRowField(row, field, event.target.value);
         if (field === "manual_primary_issue") {
@@ -1335,22 +1465,29 @@
     bindSelect("manual-rgb-context-advantage-confirmed", "manual_rgb_context_advantage_confirmed");
     bindSelect("manual-keep-for-report", "manual_keep_for_report");
 
-    document.getElementById("manual-notes").addEventListener("input", (event) => {
-      setRowField(row, "manual_notes", event.target.value);
-    });
+    const notesNode = document.getElementById("manual-notes");
+    if (notesNode) {
+      notesNode.addEventListener("input", (event) => {
+        setRowField(row, "manual_notes", event.target.value);
+      });
+    }
 
     document.querySelectorAll("[data-tag]").forEach((node) => {
       node.addEventListener("change", () => updateIssueTagsFromDom(row));
     });
 
     const saveRowBtn = document.getElementById("save-row-btn");
-    saveRowBtn.disabled = !state.backendAvailable && !state.autosaveSupported;
-    saveRowBtn.title = saveRowBtn.disabled
-      ? "No backend save and no browser file-save support are available."
-      : "Save the current review row and manifest.";
-    saveRowBtn.addEventListener("click", () => saveNow());
-    document.getElementById("prev-row-btn").addEventListener("click", () => navigateRow(-1));
-    document.getElementById("next-row-btn").addEventListener("click", () => navigateRow(1));
+    if (saveRowBtn) {
+      saveRowBtn.disabled = !state.backendAvailable && !state.autosaveSupported;
+      saveRowBtn.title = saveRowBtn.disabled
+        ? "No backend save and no browser file-save support are available."
+        : "Save the current review row and manifest.";
+      saveRowBtn.addEventListener("click", () => saveNow());
+    }
+    const prevBtn = document.getElementById("prev-row-btn");
+    const nextBtn = document.getElementById("next-row-btn");
+    if (prevBtn) prevBtn.addEventListener("click", () => navigateRow(-1));
+    if (nextBtn) nextBtn.addEventListener("click", () => navigateRow(1));
   }
 
   function setManifest(headers, rows, manifestName) {
@@ -1368,6 +1505,9 @@
     ensureSelection();
     DOM.exportBtn.disabled = !state.rows.length;
     DOM.downloadJsonBtn.disabled = !state.rows.length;
+    // Keep visible alias in sync
+    const exportCsvBtn = document.getElementById("export-csv-btn");
+    if (exportCsvBtn) exportCsvBtn.disabled = DOM.exportBtn.disabled;
     updateAutosaveControls();
     renderCaseList();
     persistDraft();
@@ -1466,10 +1606,14 @@
             : payload.videoBasePath;
       }
       if (payload.poseBasePath) {
-        DOM.poseBasePath.value =
-          payload.poseBasePath === "/Data/LLSP/annotation_cleaned/pose_features/"
-            ? DEFAULT_POSE_BASE_PATH
-            : payload.poseBasePath;
+        const LEGACY_POSE_PATHS = [
+          "/Data/LLSP/annotation_cleaned/pose_features/",
+          "/datasets/metadata/llsp/pose_features/",
+          "../../Data/LLSP/annotation_cleaned/pose_features/",
+        ];
+        DOM.poseBasePath.value = LEGACY_POSE_PATHS.includes(payload.poseBasePath)
+          ? DEFAULT_POSE_BASE_PATH
+          : payload.poseBasePath;
       }
       if (payload.annotationBasePath) {
         DOM.annotationBasePath.value =
@@ -1478,7 +1622,13 @@
             : payload.annotationBasePath;
       }
       if (payload.serverSavePath) {
-        DOM.serverSavePath.value = payload.serverSavePath;
+        const LEGACY_SERVER_PATHS = [
+          "src/rep_counter/training_outputs/hard_case_review_manifest.csv",
+          "outputs/training_outputs/hard_case_review_manifest.csv",
+        ];
+        DOM.serverSavePath.value = LEGACY_SERVER_PATHS.includes(payload.serverSavePath)
+          ? DEFAULT_SERVER_SAVE_PATH
+          : payload.serverSavePath;
       }
       if (payload.backendApiBase) {
         DOM.backendApiBase.value = normalizeBackendApiBase(payload.backendApiBase);
@@ -1512,7 +1662,14 @@
       }
       const response = await fetch(DEFAULT_MANIFEST_PATH, { cache: "no-store" });
       if (!response.ok) {
-        throw new Error(`Could not fetch ${DEFAULT_MANIFEST_PATH} (${response.status})`);
+        // Fallback: load sample manifest for hosted/offline demo (GitHub Pages)
+        const sampleResponse = await fetch("./sample_manifest.csv", { cache: "no-store" });
+        if (!sampleResponse.ok) {
+          throw new Error(`Could not fetch ${DEFAULT_MANIFEST_PATH} (${response.status})`);
+        }
+        const sampleText = await sampleResponse.text();
+        parseManifestText(sampleText, "sample_manifest.csv");
+        return;
       }
       const text = await response.text();
       parseManifestText(text, "hard_case_review_manifest.csv");
@@ -1560,6 +1717,13 @@
     DOM.filterExercise.addEventListener("change", renderCaseList);
     DOM.filterStatus.addEventListener("change", renderCaseList);
     DOM.filterSearch.addEventListener("input", renderCaseList);
+
+    // New filter inputs
+    const filterSeverity = document.getElementById("filter-severity");
+    const filterBucket   = document.getElementById("filter-bucket");
+    if (filterSeverity) filterSeverity.addEventListener("change", renderCaseList);
+    if (filterBucket)   filterBucket.addEventListener("change", renderCaseList);
+
     DOM.videoBasePath.addEventListener("change", () => {
       persistDraft();
       renderMainPanel();
@@ -1605,5 +1769,9 @@
   restoreDraft();
   updateServerSaveLink();
   updateAutosaveControls();
-  detectBackendAvailability();
+  detectBackendAvailability().then(() => {
+    if (!state.rows.length) {
+      loadDefaultManifest();
+    }
+  });
 })();
